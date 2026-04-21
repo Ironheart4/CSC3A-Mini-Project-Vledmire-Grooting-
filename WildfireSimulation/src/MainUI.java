@@ -46,6 +46,8 @@ public class MainUI {
 
 	private BufferedImage originalImage;
 	private BufferedImage classifiedImage;
+	private Image originalFxImage;
+	private Image classifiedFxImage;
 	private Node[][] graph;
 	private Node ignitionNode;
 
@@ -210,6 +212,8 @@ public class MainUI {
 			int blockSize = (int) Math.round(blockSizeSlider.getValue());
 			graph = graphBuilder.build(originalImage, blockSize);
 			classifiedImage = imageClassifier.createMaskedImage(graph, originalImage);
+			originalFxImage = toFxImage(originalImage);
+			classifiedFxImage = toFxImage(classifiedImage);
 			ignitionNode = null;
 			spreadOrder = null;
 			spreadIndex = 0;
@@ -246,7 +250,7 @@ public class MainUI {
 		GraphicsContext gc = originalCanvas.getGraphicsContext2D();
 		gc.clearRect(0, 0, originalCanvas.getWidth(), originalCanvas.getHeight());
 		if (originalImage != null) {
-			drawBufferedImageScaled(originalImage, originalCanvas, true);
+			drawBufferedImageScaled(originalImage, originalFxImage, originalCanvas, true);
 		}
 		updatePlaceholderVisibility();
 	}
@@ -255,7 +259,7 @@ public class MainUI {
 		GraphicsContext gc = classifiedCanvas.getGraphicsContext2D();
 		gc.clearRect(0, 0, classifiedCanvas.getWidth(), classifiedCanvas.getHeight());
 		if (classifiedImage != null) {
-			Rectangle2D drawRegion = drawBufferedImageScaled(classifiedImage, classifiedCanvas, true);
+			Rectangle2D drawRegion = drawBufferedImageScaled(classifiedImage, classifiedFxImage, classifiedCanvas, true);
 			classifiedImgX = drawRegion.getMinX();
 			classifiedImgY = drawRegion.getMinY();
 			classifiedImgW = drawRegion.getWidth();
@@ -394,13 +398,15 @@ public class MainUI {
 		redrawOverlay();
 	}
 
-	private Rectangle2D drawBufferedImageScaled(BufferedImage image, Canvas canvas, boolean keepAspect) {
+	private Rectangle2D drawBufferedImageScaled(BufferedImage image, Image fxImage, Canvas canvas, boolean keepAspect) {
 		if (image == null || canvas.getWidth() <= 0 || canvas.getHeight() <= 0) {
 			return new Rectangle2D(0, 0, 0, 0);
 		}
 		GraphicsContext gc = canvas.getGraphicsContext2D();
 		Rectangle2D drawRegion = computeDrawRegion(image, canvas, keepAspect);
-		Image fxImage = toFxImage(image);
+		if (fxImage == null) {
+			fxImage = toFxImage(image);
+		}
 		gc.drawImage(fxImage, drawRegion.getMinX(), drawRegion.getMinY(), drawRegion.getWidth(), drawRegion.getHeight());
 		return drawRegion;
 	}
