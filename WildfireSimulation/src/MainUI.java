@@ -15,6 +15,7 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
 import javafx.scene.image.Image;
+import javafx.scene.image.PixelFormat;
 import javafx.scene.image.PixelWriter;
 import javafx.scene.image.WritableImage;
 import javafx.scene.layout.Background;
@@ -409,11 +410,8 @@ public class MainUI {
 		int height = image.getHeight();
 		WritableImage writableImage = new WritableImage(width, height);
 		PixelWriter pixelWriter = writableImage.getPixelWriter();
-		for (int y = 0; y < height; y++) {
-			for (int x = 0; x < width; x++) {
-				pixelWriter.setArgb(x, y, image.getRGB(x, y));
-			}
-		}
+		int[] argb = image.getRGB(0, 0, width, height, null, 0, width);
+		pixelWriter.setPixels(0, 0, width, height, PixelFormat.getIntArgbInstance(), argb, 0, width);
 		return writableImage;
 	}
 
