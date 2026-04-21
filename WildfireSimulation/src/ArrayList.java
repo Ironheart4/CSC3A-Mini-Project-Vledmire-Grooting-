@@ -1,3 +1,4 @@
+package src;
 /**
  * Self-implemented ArrayList<T> for the Graph-Based Wildfire Spread Simulation System
  * Auxiliary data structure (encouraged by Mini Project spec)
