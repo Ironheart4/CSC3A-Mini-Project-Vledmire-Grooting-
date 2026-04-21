@@ -224,9 +224,6 @@ public class MainUI {
 		}
 
 		double speed = speedSlider.getValue();
-		if (speed <= 0) {
-			speed = 1;
-		}
 		Duration frame = Duration.millis(1000.0 / speed);
 		fireTimeline = new Timeline(new KeyFrame(frame, e -> {
 			if (spreadIndex >= order.size()) {
