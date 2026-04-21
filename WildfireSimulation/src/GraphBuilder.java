@@ -36,13 +36,20 @@ public class GraphBuilder {
             for (int c = 0; c < cols; c++) {
                 Node current = grid[r][c];
 
-                if (r > 0) current.addEdge(new Edge(grid[r-1][c], current.getTerrain().getSpreadCost()));
-                if (r < rows - 1) current.addEdge(new Edge(grid[r+1][c], current.getTerrain().getSpreadCost()));
-                if (c > 0) current.addEdge(new Edge(grid[r][c-1], current.getTerrain().getSpreadCost()));
-                if (c < cols - 1) current.addEdge(new Edge(grid[r][c+1], current.getTerrain().getSpreadCost()));
+                if (r > 0) addEdge(current, grid[r - 1][c]);
+                if (r < rows - 1) addEdge(current, grid[r + 1][c]);
+                if (c > 0) addEdge(current, grid[r][c - 1]);
+                if (c < cols - 1) addEdge(current, grid[r][c + 1]);
             }
         }
 
         return grid;
+    }
+
+    private void addEdge(Node from, Node to) {
+        double weight = to.getTerrain() == Terrain.WATER
+                ? Double.POSITIVE_INFINITY
+                : to.getTerrain().getSpreadCost();
+        from.addEdge(new Edge(to, weight));
     }
 }
