@@ -5,7 +5,6 @@ import java.io.IOException;
 
 import javafx.animation.KeyFrame;
 import javafx.animation.Timeline;
-import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
@@ -16,9 +15,17 @@ import javafx.scene.control.Button;
 import javafx.scene.control.Label;
 import javafx.scene.control.Slider;
 import javafx.scene.image.Image;
+import javafx.scene.image.PixelWriter;
+import javafx.scene.image.WritableImage;
+import javafx.scene.layout.Background;
+import javafx.scene.layout.BackgroundFill;
 import javafx.scene.layout.BorderPane;
+import javafx.scene.layout.Border;
+import javafx.scene.layout.BorderStroke;
+import javafx.scene.layout.BorderStrokeStyle;
+import javafx.scene.layout.BorderWidths;
+import javafx.scene.layout.CornerRadii;
 import javafx.scene.layout.HBox;
-import javafx.scene.layout.Priority;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
@@ -54,6 +61,10 @@ public class MainUI {
 	private Timeline fireTimeline;
 	private ArrayList<Node> spreadOrder;
 	private int spreadIndex;
+	private double classifiedImgX;
+	private double classifiedImgY;
+	private double classifiedImgW;
+	private double classifiedImgH;
 
 	public MainUI(Stage stage) {
 		this.stage = stage;
@@ -90,6 +101,8 @@ public class MainUI {
 		Button startButton = new Button("Start Simulation");
 		Button resetButton = new Button("Reset");
 		Button clearOverlayButton = new Button("Clear Overlay");
+		Label blockSizeLabel = new Label("Block Size");
+		Label speedLabel = new Label("Animation Speed (nodes/sec)");
 
 		loadButton.setMaxWidth(Double.MAX_VALUE);
 		startButton.setMaxWidth(Double.MAX_VALUE);
@@ -101,79 +114,76 @@ public class MainUI {
 		resetButton.setOnAction(e -> resetSimulation());
 		clearOverlayButton.setOnAction(e -> clearOverlay());
 
-		titleLabel.getStyleClass().add("app-title");
-		loadButton.getStyleClass().addAll("action-button", "btn-load");
-		startButton.getStyleClass().addAll("action-button", "btn-start");
-		resetButton.getStyleClass().addAll("action-button", "btn-reset");
-		clearOverlayButton.getStyleClass().addAll("action-button", "btn-clear");
-		blockSizeSlider.getStyleClass().add("slider-block");
-		speedSlider.getStyleClass().add("slider-speed");
-		originalPlaceholder.getStyleClass().add("viewer-placeholder");
-		classifiedPlaceholder.getStyleClass().add("viewer-placeholder");
+		titleLabel.setStyle("-fx-text-fill: #74ff87; -fx-font-size: 24px; -fx-font-weight: bold;");
+		String buttonBase = "-fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8;";
+		loadButton.setStyle(buttonBase + " -fx-background-color: #2e7d32;");
+		startButton.setStyle(buttonBase + " -fx-background-color: #ef6c00;");
+		resetButton.setStyle(buttonBase + " -fx-background-color: #1565c0;");
+		clearOverlayButton.setStyle(buttonBase + " -fx-background-color: #6a1b9a;");
+		blockSizeLabel.setStyle("-fx-text-fill: #d4f5dd; -fx-font-weight: 600;");
+		speedLabel.setStyle("-fx-text-fill: #d4f5dd; -fx-font-weight: 600;");
+		originalPlaceholder.setStyle("-fx-text-fill: #9cc6ab; -fx-font-size: 15px; -fx-font-style: italic;");
+		classifiedPlaceholder.setStyle("-fx-text-fill: #9cc6ab; -fx-font-size: 15px; -fx-font-style: italic;");
 		originalPlaceholder.setMouseTransparent(true);
 		classifiedPlaceholder.setMouseTransparent(true);
-		statusLabel.getStyleClass().add("status-label");
+		statusLabel.setStyle("-fx-text-fill: #d3f9d8; -fx-font-weight: 600;");
 
 		VBox controls = new VBox(10,
 				loadButton,
-				new Label("Block Size"),
+				blockSizeLabel,
 				blockSizeSlider,
-				new Label("Animation Speed (nodes/sec)"),
+				speedLabel,
 				speedSlider,
 				startButton,
 				resetButton,
 				clearOverlayButton);
-		controls.getStyleClass().add("control-panel");
 		controls.setPadding(new Insets(12));
 		controls.setPrefWidth(260);
+		controls.setStyle(
+				"-fx-background-color: rgba(10, 26, 19, 0.85);"
+						+ "-fx-background-radius: 12;"
+						+ "-fx-border-color: #2d6a4f;"
+						+ "-fx-border-radius: 12;");
 
 		StackPane originalPanel = new StackPane(originalCanvas, originalPlaceholder);
 		StackPane classifiedPanel = new StackPane(classifiedCanvas, overlayCanvas, classifiedPlaceholder);
-		originalPanel.getStyleClass().add("viewer-pane");
-		classifiedPanel.getStyleClass().add("viewer-pane");
+		originalPanel.setMinSize(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
 		originalPanel.setPrefSize(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
+		originalPanel.setMaxSize(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
+		classifiedPanel.setMinSize(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
 		classifiedPanel.setPrefSize(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
-		VBox.setVgrow(originalPanel, Priority.ALWAYS);
-		VBox.setVgrow(classifiedPanel, Priority.ALWAYS);
-
-		originalCanvas.widthProperty().bind(originalPanel.widthProperty());
-		originalCanvas.heightProperty().bind(originalPanel.heightProperty());
-		classifiedCanvas.widthProperty().bind(classifiedPanel.widthProperty());
-		classifiedCanvas.heightProperty().bind(classifiedPanel.heightProperty());
-		overlayCanvas.widthProperty().bind(classifiedPanel.widthProperty());
-		overlayCanvas.heightProperty().bind(classifiedPanel.heightProperty());
-
-		originalPanel.widthProperty().addListener((obs, oldVal, newVal) -> drawOriginalImage());
-		originalPanel.heightProperty().addListener((obs, oldVal, newVal) -> drawOriginalImage());
-		classifiedPanel.widthProperty().addListener((obs, oldVal, newVal) -> redrawClassifiedViewer());
-		classifiedPanel.heightProperty().addListener((obs, oldVal, newVal) -> redrawClassifiedViewer());
+		classifiedPanel.setMaxSize(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
+		Border viewerBorder = new Border(new BorderStroke(Color.web("#4f7f62"), BorderStrokeStyle.DASHED,
+				new CornerRadii(0), new BorderWidths(2)));
+		Background viewerBackground = new Background(new BackgroundFill(Color.web("#09160f"), CornerRadii.EMPTY, Insets.EMPTY));
+		originalPanel.setBorder(viewerBorder);
+		originalPanel.setBackground(viewerBackground);
+		classifiedPanel.setBorder(viewerBorder);
+		classifiedPanel.setBackground(viewerBackground);
 
 		overlayCanvas.setMouseTransparent(false);
 		overlayCanvas.setOnMouseClicked(e -> handleMouseClick(e.getX(), e.getY()));
 
 		Label originalTitle = new Label("Original Terrain Image");
 		Label classifiedTitle = new Label("Classified / Masked Image");
-		originalTitle.getStyleClass().add("viewer-title");
-		classifiedTitle.getStyleClass().add("viewer-title");
+		originalTitle.setStyle("-fx-text-fill: #95ffa3; -fx-font-size: 16px; -fx-font-weight: bold;");
+		classifiedTitle.setStyle("-fx-text-fill: #95ffa3; -fx-font-size: 16px; -fx-font-weight: bold;");
 
 		VBox originalBox = new VBox(6, originalTitle, originalPanel);
 		VBox classifiedBox = new VBox(6, classifiedTitle, classifiedPanel);
-		originalBox.getStyleClass().add("viewer-box");
-		classifiedBox.getStyleClass().add("viewer-box");
 		originalBox.setPadding(new Insets(10));
 		classifiedBox.setPadding(new Insets(10));
 		originalBox.setAlignment(Pos.TOP_CENTER);
 		classifiedBox.setAlignment(Pos.TOP_CENTER);
-		VBox.setVgrow(originalBox, Priority.ALWAYS);
-		VBox.setVgrow(classifiedBox, Priority.ALWAYS);
+		originalBox.setStyle("-fx-background-color: rgba(8, 22, 16, 0.65); -fx-background-radius: 10;");
+		classifiedBox.setStyle("-fx-background-color: rgba(8, 22, 16, 0.65); -fx-background-radius: 10;");
 
 		HBox center = new HBox(10, originalBox, classifiedBox);
 		center.setPadding(new Insets(10));
-		HBox.setHgrow(originalBox, Priority.ALWAYS);
-		HBox.setHgrow(classifiedBox, Priority.ALWAYS);
+		center.setAlignment(Pos.TOP_CENTER);
 
 		BorderPane root = new BorderPane();
-		root.getStyleClass().add("app-root");
+		root.setStyle("-fx-background-color: linear-gradient(to bottom, #0f2a20 0%, #153527 100%);");
 		root.setLeft(controls);
 		root.setCenter(center);
 		root.setTop(titleLabel);
@@ -244,7 +254,16 @@ public class MainUI {
 		GraphicsContext gc = classifiedCanvas.getGraphicsContext2D();
 		gc.clearRect(0, 0, classifiedCanvas.getWidth(), classifiedCanvas.getHeight());
 		if (classifiedImage != null) {
-			drawBufferedImageScaled(classifiedImage, classifiedCanvas, true);
+			Rectangle2D drawRegion = drawBufferedImageScaled(classifiedImage, classifiedCanvas, true);
+			classifiedImgX = drawRegion.getMinX();
+			classifiedImgY = drawRegion.getMinY();
+			classifiedImgW = drawRegion.getWidth();
+			classifiedImgH = drawRegion.getHeight();
+		} else {
+			classifiedImgX = 0;
+			classifiedImgY = 0;
+			classifiedImgW = 0;
+			classifiedImgH = 0;
 		}
 		updatePlaceholderVisibility();
 	}
@@ -254,11 +273,10 @@ public class MainUI {
 			return;
 		}
 
-		Rectangle2D drawRegion = computeDrawRegion(classifiedImage, overlayCanvas, true);
-		double drawX = drawRegion.getMinX();
-		double drawY = drawRegion.getMinY();
-		double drawW = drawRegion.getWidth();
-		double drawH = drawRegion.getHeight();
+		double drawX = classifiedImgX;
+		double drawY = classifiedImgY;
+		double drawW = classifiedImgW;
+		double drawH = classifiedImgH;
 		if (drawW <= 0 || drawH <= 0 || x < drawX || x > drawX + drawW || y < drawY || y > drawY + drawH) {
 			setStatus("Click inside the displayed classified image to set ignition.");
 			return;
@@ -308,11 +326,10 @@ public class MainUI {
 			return;
 		}
 
-		Rectangle2D drawRegion = computeDrawRegion(classifiedImage, overlayCanvas, true);
-		double drawX = drawRegion.getMinX();
-		double drawY = drawRegion.getMinY();
-		double drawW = drawRegion.getWidth();
-		double drawH = drawRegion.getHeight();
+		double drawX = classifiedImgX;
+		double drawY = classifiedImgY;
+		double drawW = classifiedImgW;
+		double drawH = classifiedImgH;
 		if (drawW <= 0 || drawH <= 0) {
 			return;
 		}
@@ -376,14 +393,28 @@ public class MainUI {
 		redrawOverlay();
 	}
 
-	private void drawBufferedImageScaled(BufferedImage image, Canvas canvas, boolean keepAspect) {
+	private Rectangle2D drawBufferedImageScaled(BufferedImage image, Canvas canvas, boolean keepAspect) {
 		if (image == null || canvas.getWidth() <= 0 || canvas.getHeight() <= 0) {
-			return;
+			return new Rectangle2D(0, 0, 0, 0);
 		}
 		GraphicsContext gc = canvas.getGraphicsContext2D();
 		Rectangle2D drawRegion = computeDrawRegion(image, canvas, keepAspect);
-		Image fxImage = SwingFXUtils.toFXImage(image, null);
+		Image fxImage = toFxImage(image);
 		gc.drawImage(fxImage, drawRegion.getMinX(), drawRegion.getMinY(), drawRegion.getWidth(), drawRegion.getHeight());
+		return drawRegion;
+	}
+
+	private Image toFxImage(BufferedImage image) {
+		int width = image.getWidth();
+		int height = image.getHeight();
+		WritableImage writableImage = new WritableImage(width, height);
+		PixelWriter pixelWriter = writableImage.getPixelWriter();
+		for (int y = 0; y < height; y++) {
+			for (int x = 0; x < width; x++) {
+				pixelWriter.setArgb(x, y, image.getRGB(x, y));
+			}
+		}
+		return writableImage;
 	}
 
 	private Rectangle2D computeDrawRegion(BufferedImage image, Canvas canvas, boolean keepAspect) {

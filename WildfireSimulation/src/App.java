@@ -10,10 +10,6 @@ public class App extends Application {
 	public void start(Stage stage) {
 		MainUI ui = new MainUI(stage);
 		Scene scene = ui.createScene();
-		java.net.URL css = App.class.getResource("ui.css");
-		if (css != null) {
-			scene.getStylesheets().add(css.toExternalForm());
-		}
 		stage.setTitle("Wildfire Spread Simulation");
 		stage.setScene(scene);
 		stage.show();
