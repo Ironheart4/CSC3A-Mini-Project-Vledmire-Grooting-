@@ -8,6 +8,7 @@ import javafx.animation.Timeline;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
@@ -26,6 +27,9 @@ import javafx.util.Duration;
 
 public class MainUI {
 
+	private static final double DEFAULT_VIEWER_WIDTH = 520;
+	private static final double DEFAULT_VIEWER_HEIGHT = 420;
+
 	private final Stage stage;
 	private final GraphBuilder graphBuilder;
 	private final ImageClassifier imageClassifier;
@@ -40,6 +44,8 @@ public class MainUI {
 	private final Canvas originalCanvas;
 	private final Canvas classifiedCanvas;
 	private final Canvas overlayCanvas;
+	private final Label originalPlaceholder;
+	private final Label classifiedPlaceholder;
 
 	private final Slider blockSizeSlider;
 	private final Slider speedSlider;
@@ -56,9 +62,11 @@ public class MainUI {
 		this.wildfireDijkstra = new WildfireDijkstra();
 		this.imageLoader = new ImageLoader();
 
-		this.originalCanvas = new Canvas(500, 400);
-		this.classifiedCanvas = new Canvas(500, 400);
-		this.overlayCanvas = new Canvas(500, 400);
+		this.originalCanvas = new Canvas(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
+		this.classifiedCanvas = new Canvas(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
+		this.overlayCanvas = new Canvas(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
+		this.originalPlaceholder = new Label("No terrain image loaded");
+		this.classifiedPlaceholder = new Label("Awaiting classification");
 
 		this.blockSizeSlider = new Slider(5, 50, 10);
 		this.blockSizeSlider.setShowTickMarks(true);
@@ -77,6 +85,7 @@ public class MainUI {
 	}
 
 	public Scene createScene() {
+		Label titleLabel = new Label("Wildfire Spread Simulation");
 		Button loadButton = new Button("Load Terrain Image");
 		Button startButton = new Button("Start Simulation");
 		Button resetButton = new Button("Reset");
@@ -92,6 +101,19 @@ public class MainUI {
 		resetButton.setOnAction(e -> resetSimulation());
 		clearOverlayButton.setOnAction(e -> clearOverlay());
 
+		titleLabel.getStyleClass().add("app-title");
+		loadButton.getStyleClass().addAll("action-button", "btn-load");
+		startButton.getStyleClass().addAll("action-button", "btn-start");
+		resetButton.getStyleClass().addAll("action-button", "btn-reset");
+		clearOverlayButton.getStyleClass().addAll("action-button", "btn-clear");
+		blockSizeSlider.getStyleClass().add("slider-block");
+		speedSlider.getStyleClass().add("slider-speed");
+		originalPlaceholder.getStyleClass().add("viewer-placeholder");
+		classifiedPlaceholder.getStyleClass().add("viewer-placeholder");
+		originalPlaceholder.setMouseTransparent(true);
+		classifiedPlaceholder.setMouseTransparent(true);
+		statusLabel.getStyleClass().add("status-label");
+
 		VBox controls = new VBox(10,
 				loadButton,
 				new Label("Block Size"),
@@ -101,19 +123,49 @@ public class MainUI {
 				startButton,
 				resetButton,
 				clearOverlayButton);
+		controls.getStyleClass().add("control-panel");
 		controls.setPadding(new Insets(12));
 		controls.setPrefWidth(260);
 
-		StackPane classifiedPanel = new StackPane(classifiedCanvas, overlayCanvas);
+		StackPane originalPanel = new StackPane(originalCanvas, originalPlaceholder);
+		StackPane classifiedPanel = new StackPane(classifiedCanvas, overlayCanvas, classifiedPlaceholder);
+		originalPanel.getStyleClass().add("viewer-pane");
+		classifiedPanel.getStyleClass().add("viewer-pane");
+		originalPanel.setPrefSize(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
+		classifiedPanel.setPrefSize(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
+		VBox.setVgrow(originalPanel, Priority.ALWAYS);
+		VBox.setVgrow(classifiedPanel, Priority.ALWAYS);
+
+		originalCanvas.widthProperty().bind(originalPanel.widthProperty());
+		originalCanvas.heightProperty().bind(originalPanel.heightProperty());
+		classifiedCanvas.widthProperty().bind(classifiedPanel.widthProperty());
+		classifiedCanvas.heightProperty().bind(classifiedPanel.heightProperty());
+		overlayCanvas.widthProperty().bind(classifiedPanel.widthProperty());
+		overlayCanvas.heightProperty().bind(classifiedPanel.heightProperty());
+
+		originalPanel.widthProperty().addListener((obs, oldVal, newVal) -> drawOriginalImage());
+		originalPanel.heightProperty().addListener((obs, oldVal, newVal) -> drawOriginalImage());
+		classifiedPanel.widthProperty().addListener((obs, oldVal, newVal) -> redrawClassifiedViewer());
+		classifiedPanel.heightProperty().addListener((obs, oldVal, newVal) -> redrawClassifiedViewer());
+
 		overlayCanvas.setMouseTransparent(false);
 		overlayCanvas.setOnMouseClicked(e -> handleMouseClick(e.getX(), e.getY()));
 
-		VBox originalBox = new VBox(6, new Label("Original Terrain Image"), originalCanvas);
-		VBox classifiedBox = new VBox(6, new Label("Classified / Masked Image"), classifiedPanel);
+		Label originalTitle = new Label("Original Terrain Image");
+		Label classifiedTitle = new Label("Classified / Masked Image");
+		originalTitle.getStyleClass().add("viewer-title");
+		classifiedTitle.getStyleClass().add("viewer-title");
+
+		VBox originalBox = new VBox(6, originalTitle, originalPanel);
+		VBox classifiedBox = new VBox(6, classifiedTitle, classifiedPanel);
+		originalBox.getStyleClass().add("viewer-box");
+		classifiedBox.getStyleClass().add("viewer-box");
 		originalBox.setPadding(new Insets(10));
 		classifiedBox.setPadding(new Insets(10));
 		originalBox.setAlignment(Pos.TOP_CENTER);
 		classifiedBox.setAlignment(Pos.TOP_CENTER);
+		VBox.setVgrow(originalBox, Priority.ALWAYS);
+		VBox.setVgrow(classifiedBox, Priority.ALWAYS);
 
 		HBox center = new HBox(10, originalBox, classifiedBox);
 		center.setPadding(new Insets(10));
@@ -121,8 +173,12 @@ public class MainUI {
 		HBox.setHgrow(classifiedBox, Priority.ALWAYS);
 
 		BorderPane root = new BorderPane();
+		root.getStyleClass().add("app-root");
 		root.setLeft(controls);
 		root.setCenter(center);
+		root.setTop(titleLabel);
+		BorderPane.setMargin(titleLabel, new Insets(10, 10, 0, 10));
+		BorderPane.setAlignment(titleLabel, Pos.CENTER_LEFT);
 		BorderPane.setMargin(statusLabel, new Insets(6, 10, 10, 10));
 		root.setBottom(statusLabel);
 
@@ -147,7 +203,6 @@ public class MainUI {
 			spreadOrder = null;
 			spreadIndex = 0;
 
-			resizeCanvases(originalImage.getWidth(), originalImage.getHeight());
 			drawOriginalImage();
 			drawClassifiedMaskedImage();
 			redrawOverlay();
@@ -177,32 +232,40 @@ public class MainUI {
 	}
 
 	public void drawOriginalImage() {
-		if (originalImage == null) {
-			return;
-		}
 		GraphicsContext gc = originalCanvas.getGraphicsContext2D();
 		gc.clearRect(0, 0, originalCanvas.getWidth(), originalCanvas.getHeight());
-		Image fxImage = SwingFXUtils.toFXImage(originalImage, null);
-		gc.drawImage(fxImage, 0, 0, originalCanvas.getWidth(), originalCanvas.getHeight());
+		if (originalImage != null) {
+			drawBufferedImageScaled(originalImage, originalCanvas, true);
+		}
+		updatePlaceholderVisibility();
 	}
 
 	public void drawClassifiedMaskedImage() {
-		if (classifiedImage == null) {
-			return;
-		}
 		GraphicsContext gc = classifiedCanvas.getGraphicsContext2D();
 		gc.clearRect(0, 0, classifiedCanvas.getWidth(), classifiedCanvas.getHeight());
-		Image fxImage = SwingFXUtils.toFXImage(classifiedImage, null);
-		gc.drawImage(fxImage, 0, 0, classifiedCanvas.getWidth(), classifiedCanvas.getHeight());
+		if (classifiedImage != null) {
+			drawBufferedImageScaled(classifiedImage, classifiedCanvas, true);
+		}
+		updatePlaceholderVisibility();
 	}
 
 	public void handleMouseClick(double x, double y) {
-		if (graph == null || graph.length == 0 || graph[0].length == 0) {
+		if (graph == null || graph.length == 0 || graph[0].length == 0 || classifiedImage == null) {
 			return;
 		}
 
-		int row = (int) (y / overlayCanvas.getHeight() * graph.length);
-		int col = (int) (x / overlayCanvas.getWidth() * graph[0].length);
+		Rectangle2D drawRegion = computeDrawRegion(classifiedImage, overlayCanvas, true);
+		double drawX = drawRegion.getMinX();
+		double drawY = drawRegion.getMinY();
+		double drawW = drawRegion.getWidth();
+		double drawH = drawRegion.getHeight();
+		if (drawW <= 0 || drawH <= 0 || x < drawX || x > drawX + drawW || y < drawY || y > drawY + drawH) {
+			setStatus("Click inside the displayed classified image to set ignition.");
+			return;
+		}
+
+		int row = (int) ((y - drawY) / drawH * graph.length);
+		int col = (int) ((x - drawX) / drawW * graph[0].length);
 		row = Math.max(0, Math.min(row, graph.length - 1));
 		col = Math.max(0, Math.min(col, graph[0].length - 1));
 
@@ -241,29 +304,43 @@ public class MainUI {
 	private void redrawOverlay() {
 		GraphicsContext gc = overlayCanvas.getGraphicsContext2D();
 		gc.clearRect(0, 0, overlayCanvas.getWidth(), overlayCanvas.getHeight());
-		if (graph == null || graph.length == 0 || graph[0].length == 0) {
+		if (classifiedImage == null || graph == null || graph.length == 0 || graph[0].length == 0) {
 			return;
 		}
 
-		double cellW = overlayCanvas.getWidth() / graph[0].length;
-		double cellH = overlayCanvas.getHeight() / graph.length;
+		Rectangle2D drawRegion = computeDrawRegion(classifiedImage, overlayCanvas, true);
+		double drawX = drawRegion.getMinX();
+		double drawY = drawRegion.getMinY();
+		double drawW = drawRegion.getWidth();
+		double drawH = drawRegion.getHeight();
+		if (drawW <= 0 || drawH <= 0) {
+			return;
+		}
+		double cellW = drawW / graph[0].length;
+		double cellH = drawH / graph.length;
+
+		gc.save();
+		gc.beginPath();
+		gc.rect(drawX, drawY, drawW, drawH);
+		gc.clip();
 
 		if (spreadOrder != null) {
 			gc.setFill(Color.rgb(255, 69, 0, 0.45));
 			int limit = Math.min(spreadIndex, spreadOrder.size());
 			for (int i = 0; i < limit; i++) {
 				Node node = spreadOrder.get(i);
-				gc.fillRect(node.getCol() * cellW, node.getRow() * cellH, cellW, cellH);
+				gc.fillRect(drawX + (node.getCol() * cellW), drawY + (node.getRow() * cellH), cellW, cellH);
 			}
 		}
 
 		if (ignitionNode != null) {
 			gc.setStroke(Color.YELLOW);
 			gc.setLineWidth(2);
-			double x = ignitionNode.getCol() * cellW;
-			double y = ignitionNode.getRow() * cellH;
+			double x = drawX + (ignitionNode.getCol() * cellW);
+			double y = drawY + (ignitionNode.getRow() * cellH);
 			gc.strokeRect(x, y, cellW, cellH);
 		}
+		gc.restore();
 	}
 
 	private void clearOverlay() {
@@ -294,13 +371,47 @@ public class MainUI {
 		}
 	}
 
-	private void resizeCanvases(double width, double height) {
-		originalCanvas.setWidth(width);
-		originalCanvas.setHeight(height);
-		classifiedCanvas.setWidth(width);
-		classifiedCanvas.setHeight(height);
-		overlayCanvas.setWidth(width);
-		overlayCanvas.setHeight(height);
+	private void redrawClassifiedViewer() {
+		drawClassifiedMaskedImage();
+		redrawOverlay();
+	}
+
+	private void drawBufferedImageScaled(BufferedImage image, Canvas canvas, boolean keepAspect) {
+		if (image == null || canvas.getWidth() <= 0 || canvas.getHeight() <= 0) {
+			return;
+		}
+		GraphicsContext gc = canvas.getGraphicsContext2D();
+		Rectangle2D drawRegion = computeDrawRegion(image, canvas, keepAspect);
+		Image fxImage = SwingFXUtils.toFXImage(image, null);
+		gc.drawImage(fxImage, drawRegion.getMinX(), drawRegion.getMinY(), drawRegion.getWidth(), drawRegion.getHeight());
+	}
+
+	private Rectangle2D computeDrawRegion(BufferedImage image, Canvas canvas, boolean keepAspect) {
+		double canvasWidth = canvas.getWidth();
+		double canvasHeight = canvas.getHeight();
+		if (image == null || canvasWidth <= 0 || canvasHeight <= 0 || image.getWidth() <= 0 || image.getHeight() <= 0) {
+			return new Rectangle2D(0, 0, 0, 0);
+		}
+
+		double drawWidth = canvasWidth;
+		double drawHeight = canvasHeight;
+		double drawX = 0;
+		double drawY = 0;
+
+		if (keepAspect) {
+			double scale = Math.min(canvasWidth / image.getWidth(), canvasHeight / image.getHeight());
+			drawWidth = image.getWidth() * scale;
+			drawHeight = image.getHeight() * scale;
+			drawX = (canvasWidth - drawWidth) / 2.0;
+			drawY = (canvasHeight - drawHeight) / 2.0;
+		}
+
+		return new Rectangle2D(drawX, drawY, drawWidth, drawHeight);
+	}
+
+	private void updatePlaceholderVisibility() {
+		originalPlaceholder.setVisible(originalImage == null);
+		classifiedPlaceholder.setVisible(classifiedImage == null);
 	}
 
 	private void updateGridStatus() {
