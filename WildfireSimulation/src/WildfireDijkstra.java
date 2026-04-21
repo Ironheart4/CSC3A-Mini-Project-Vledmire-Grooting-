@@ -7,8 +7,11 @@ package src;
 
 public class WildfireDijkstra {
 
+    private ArrayList<Node> spreadOrder = new ArrayList<>();
+
     public void computeSpreadFrom(Node start, Node[][] graph) {
         if (start == null || graph == null) return;
+        spreadOrder = new ArrayList<>();
 
         // Reset all nodes
         for (int r = 0; r < graph.length; r++) {
@@ -27,6 +30,7 @@ public class WildfireDijkstra {
             if (current == null || current.isVisited()) continue;
 
             current.setVisited(true);
+            spreadOrder.add(current);
 
             for (int i = 0; i < current.getEdges().size(); i++) {
                 Edge edge = current.getEdges().get(i);
@@ -45,17 +49,7 @@ public class WildfireDijkstra {
     /**
      * Returns nodes in order of fire spread (for animation)
      */
-    public ArrayList<Node> getSpreadOrder(Node[][] graph) {
-        ArrayList<Node> order = new ArrayList<>();
-
-        for (int r = 0; r < graph.length; r++) {
-            for (int c = 0; c < graph[r].length; c++) {
-                Node node = graph[r][c];
-                if (node.getDistance() != Double.POSITIVE_INFINITY) {
-                    order.add(node);
-                }
-            }
-        }
-        return order;
+    public ArrayList<Node> getSpreadOrder() {
+        return spreadOrder;
     }
 }
