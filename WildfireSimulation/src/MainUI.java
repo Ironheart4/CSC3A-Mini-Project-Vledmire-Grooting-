@@ -8,6 +8,7 @@ import javafx.animation.Timeline;
 import javafx.embed.swing.SwingFXUtils;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
+import javafx.geometry.Rectangle2D;
 import javafx.scene.Scene;
 import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
@@ -144,14 +145,8 @@ public class MainUI {
 
 		originalPanel.widthProperty().addListener((obs, oldVal, newVal) -> drawOriginalImage());
 		originalPanel.heightProperty().addListener((obs, oldVal, newVal) -> drawOriginalImage());
-		classifiedPanel.widthProperty().addListener((obs, oldVal, newVal) -> {
-			drawClassifiedMaskedImage();
-			redrawOverlay();
-		});
-		classifiedPanel.heightProperty().addListener((obs, oldVal, newVal) -> {
-			drawClassifiedMaskedImage();
-			redrawOverlay();
-		});
+		classifiedPanel.widthProperty().addListener((obs, oldVal, newVal) -> redrawClassifiedViewer());
+		classifiedPanel.heightProperty().addListener((obs, oldVal, newVal) -> redrawClassifiedViewer());
 
 		overlayCanvas.setMouseTransparent(false);
 		overlayCanvas.setOnMouseClicked(e -> handleMouseClick(e.getX(), e.getY()));
@@ -259,11 +254,11 @@ public class MainUI {
 			return;
 		}
 
-		double[] drawRegion = computeDrawRegion(classifiedImage, overlayCanvas, true);
-		double drawX = drawRegion[0];
-		double drawY = drawRegion[1];
-		double drawW = drawRegion[2];
-		double drawH = drawRegion[3];
+		Rectangle2D drawRegion = computeDrawRegion(classifiedImage, overlayCanvas, true);
+		double drawX = drawRegion.getMinX();
+		double drawY = drawRegion.getMinY();
+		double drawW = drawRegion.getWidth();
+		double drawH = drawRegion.getHeight();
 		if (drawW <= 0 || drawH <= 0 || x < drawX || x > drawX + drawW || y < drawY || y > drawY + drawH) {
 			setStatus("Click inside the displayed classified image to set ignition.");
 			return;
@@ -313,11 +308,11 @@ public class MainUI {
 			return;
 		}
 
-		double[] drawRegion = computeDrawRegion(classifiedImage, overlayCanvas, true);
-		double drawX = drawRegion[0];
-		double drawY = drawRegion[1];
-		double drawW = drawRegion[2];
-		double drawH = drawRegion[3];
+		Rectangle2D drawRegion = computeDrawRegion(classifiedImage, overlayCanvas, true);
+		double drawX = drawRegion.getMinX();
+		double drawY = drawRegion.getMinY();
+		double drawW = drawRegion.getWidth();
+		double drawH = drawRegion.getHeight();
 		if (drawW <= 0 || drawH <= 0) {
 			return;
 		}
@@ -376,21 +371,26 @@ public class MainUI {
 		}
 	}
 
+	private void redrawClassifiedViewer() {
+		drawClassifiedMaskedImage();
+		redrawOverlay();
+	}
+
 	private void drawBufferedImageScaled(BufferedImage image, Canvas canvas, boolean keepAspect) {
 		if (image == null || canvas.getWidth() <= 0 || canvas.getHeight() <= 0) {
 			return;
 		}
 		GraphicsContext gc = canvas.getGraphicsContext2D();
-		double[] drawRegion = computeDrawRegion(image, canvas, keepAspect);
+		Rectangle2D drawRegion = computeDrawRegion(image, canvas, keepAspect);
 		Image fxImage = SwingFXUtils.toFXImage(image, null);
-		gc.drawImage(fxImage, drawRegion[0], drawRegion[1], drawRegion[2], drawRegion[3]);
+		gc.drawImage(fxImage, drawRegion.getMinX(), drawRegion.getMinY(), drawRegion.getWidth(), drawRegion.getHeight());
 	}
 
-	private double[] computeDrawRegion(BufferedImage image, Canvas canvas, boolean keepAspect) {
+	private Rectangle2D computeDrawRegion(BufferedImage image, Canvas canvas, boolean keepAspect) {
 		double canvasWidth = canvas.getWidth();
 		double canvasHeight = canvas.getHeight();
-		if (image == null || canvasWidth <= 0 || canvasHeight <= 0) {
-			return new double[] { 0, 0, 0, 0 };
+		if (image == null || canvasWidth <= 0 || canvasHeight <= 0 || image.getWidth() <= 0 || image.getHeight() <= 0) {
+			return new Rectangle2D(0, 0, 0, 0);
 		}
 
 		double drawWidth = canvasWidth;
@@ -406,7 +406,7 @@ public class MainUI {
 			drawY = (canvasHeight - drawHeight) / 2.0;
 		}
 
-		return new double[] { drawX, drawY, drawWidth, drawHeight };
+		return new Rectangle2D(drawX, drawY, drawWidth, drawHeight);
 	}
 
 	private void updatePlaceholderVisibility() {
