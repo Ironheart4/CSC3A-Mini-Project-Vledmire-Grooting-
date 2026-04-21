@@ -3,3 +3,8 @@
 /Terrain.class
 /Edge.class
 /Node.class
+/GraphBuilder.class
+/ImageClassifier.class
+/WildfireDijkstra.class
+/PriorityQueue.class
+/MainUI.class

@@ -4,50 +4,44 @@ package src;
  * Node Class - Represents one terrain block in the wildfire graph.
  * Core of the Graph ADT. Uses Terrain enum for type safety.
  */
-public class Node {
+public class Node implements Comparable<Node> {
 
     private final int row;
     private final int col;
     private final Terrain terrain;
 
-    private double distance;      // Used only during Dijkstra simulation
+    private double distance = Double.POSITIVE_INFINITY;
     private Node previous;
     private boolean visited;
 
-    private final ArrayList<Edge> edges;   // Self-implemented ArrayList
+    private final ArrayList<Edge> edges;
 
-    /**
-     * Constructor
-     */
     public Node(int row, int col, Terrain terrain) {
         this.row = row;
         this.col = col;
         this.terrain = terrain;
-        this.distance = Double.POSITIVE_INFINITY;
-        this.previous = null;
-        this.visited = false;
         this.edges = new ArrayList<>();
     }
 
-    /**
-     * Adds a proper Edge to this node
-     */
     public void addEdge(Edge edge) {
         if (edge != null) {
             edges.add(edge);
         }
     }
 
-    /**
-     * Resets node for a new simulation run
-     */
     public void resetForSimulation() {
         this.distance = Double.POSITIVE_INFINITY;
         this.previous = null;
         this.visited = false;
     }
 
-    // Getters (strong encapsulation)
+    // Required for PriorityQueue
+    @Override
+    public int compareTo(Node other) {
+        return Double.compare(this.distance, other.distance);
+    }
+
+    // Getters
     public int getRow() { return row; }
     public int getCol() { return col; }
     public Terrain getTerrain() { return terrain; }
@@ -61,7 +55,6 @@ public class Node {
 
     @Override
     public String toString() {
-        return "Node(" + row + "," + col + ") [" + terrain + "] dist=" +
-               (distance == Double.POSITIVE_INFINITY ? "∞" : String.format("%.2f", distance));
+        return "Node(" + row + "," + col + ") [" + terrain + "]";
     }
 }
