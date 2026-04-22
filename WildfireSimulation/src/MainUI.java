@@ -26,10 +26,12 @@ import javafx.scene.layout.BorderStroke;
 import javafx.scene.layout.BorderStrokeStyle;
 import javafx.scene.layout.BorderWidths;
 import javafx.scene.layout.CornerRadii;
+import javafx.scene.layout.GridPane;
 import javafx.scene.layout.HBox;
 import javafx.scene.layout.StackPane;
 import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
+import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
 import javafx.util.Duration;
 
@@ -37,6 +39,8 @@ public class MainUI {
 
 	private static final double DEFAULT_VIEWER_WIDTH = 520;
 	private static final double DEFAULT_VIEWER_HEIGHT = 420;
+	private static final String VIEWER_BORDER_COLOR = "#4f7f62";
+	private static final String VIEWER_BACKGROUND_COLOR = "#09160f";
 
 	private final Stage stage;
 	private final GraphBuilder graphBuilder;
@@ -69,6 +73,8 @@ public class MainUI {
 	private double classifiedImgW;
 	private double classifiedImgH;
 
+	private final Label riskLabel;
+
 	public MainUI(Stage stage) {
 		this.stage = stage;
 		this.graphBuilder = new GraphBuilder();
@@ -96,6 +102,7 @@ public class MainUI {
 		this.speedSlider.setMinorTickCount(4);
 
 		this.statusLabel = new Label("Load an image to start.");
+		this.riskLabel = new Label();
 	}
 
 	public Scene createScene() {
@@ -130,6 +137,9 @@ public class MainUI {
 		originalPlaceholder.setMouseTransparent(true);
 		classifiedPlaceholder.setMouseTransparent(true);
 		statusLabel.setStyle("-fx-text-fill: #d3f9d8; -fx-font-weight: 600;");
+		riskLabel.setStyle("-fx-text-fill: #ffe082; -fx-font-size: 12px; -fx-font-weight: bold;");
+
+		VBox legend = buildLegend();
 
 		VBox controls = new VBox(10,
 				loadButton,
@@ -139,7 +149,9 @@ public class MainUI {
 				speedSlider,
 				startButton,
 				resetButton,
-				clearOverlayButton);
+				clearOverlayButton,
+				riskLabel,
+				legend);
 		controls.setPadding(new Insets(12));
 		controls.setPrefWidth(260);
 		controls.setStyle(
@@ -150,19 +162,8 @@ public class MainUI {
 
 		StackPane originalPanel = new StackPane(originalCanvas, originalPlaceholder);
 		StackPane classifiedPanel = new StackPane(classifiedCanvas, overlayCanvas, classifiedPlaceholder);
-		originalPanel.setMinSize(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
-		originalPanel.setPrefSize(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
-		originalPanel.setMaxSize(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
-		classifiedPanel.setMinSize(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
-		classifiedPanel.setPrefSize(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
-		classifiedPanel.setMaxSize(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
-		Border viewerBorder = new Border(new BorderStroke(Color.web("#4f7f62"), BorderStrokeStyle.DASHED,
-				new CornerRadii(0), new BorderWidths(2)));
-		Background viewerBackground = new Background(new BackgroundFill(Color.web("#09160f"), CornerRadii.EMPTY, Insets.EMPTY));
-		originalPanel.setBorder(viewerBorder);
-		originalPanel.setBackground(viewerBackground);
-		classifiedPanel.setBorder(viewerBorder);
-		classifiedPanel.setBackground(viewerBackground);
+		applyViewerStyle(originalPanel);
+		applyViewerStyle(classifiedPanel);
 
 		overlayCanvas.setMouseTransparent(false);
 		overlayCanvas.setOnMouseClicked(e -> handleMouseClick(e.getX(), e.getY()));
@@ -222,6 +223,8 @@ public class MainUI {
 			drawClassifiedMaskedImage();
 			redrawOverlay();
 
+			String risk = imageClassifier.classify(graph);
+			riskLabel.setText("Risk: " + risk);
 			updateGridStatus();
 		} catch (IOException ex) {
 			setStatus("Failed to load image: " + ex.getMessage());
@@ -461,5 +464,46 @@ public class MainUI {
 
 	private void setStatus(String message) {
 		statusLabel.setText(message);
+	}
+
+	private void applyViewerStyle(StackPane panel) {
+		panel.setMinSize(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
+		panel.setPrefSize(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
+		panel.setMaxSize(DEFAULT_VIEWER_WIDTH, DEFAULT_VIEWER_HEIGHT);
+		panel.setBorder(new Border(new BorderStroke(Color.web(VIEWER_BORDER_COLOR), BorderStrokeStyle.DASHED,
+				new CornerRadii(0), new BorderWidths(2))));
+		panel.setBackground(new Background(new BackgroundFill(Color.web(VIEWER_BACKGROUND_COLOR), CornerRadii.EMPTY, Insets.EMPTY)));
+	}
+
+	private VBox buildLegend() {
+		Label heading = new Label("Terrain Legend");
+		heading.setStyle("-fx-text-fill: #95ffa3; -fx-font-weight: bold; -fx-font-size: 13px;");
+
+		GridPane grid = new GridPane();
+		grid.setHgap(8);
+		grid.setVgap(5);
+
+		Terrain[] types = { Terrain.GRASSLAND, Terrain.DRY_VEGETATION, Terrain.FOREST, Terrain.WATER, Terrain.BARREN };
+		String[] names = { "Grassland", "Dry Vegetation", "Forest", "Water", "Barren" };
+
+		for (int i = 0; i < types.length; i++) {
+			Rectangle swatch = new Rectangle(16, 16);
+			String hex = types[i].getBaseColor();
+			swatch.setFill(Color.web(hex));
+			swatch.setStroke(Color.web(VIEWER_BORDER_COLOR));
+			swatch.setStrokeWidth(1);
+
+			Label name = new Label(names[i]);
+			name.setStyle("-fx-text-fill: #c8e6c9; -fx-font-size: 11px;");
+
+			grid.add(swatch, 0, i);
+			grid.add(name, 1, i);
+		}
+
+		VBox box = new VBox(6, heading, grid);
+		box.setPadding(new Insets(8));
+		box.setStyle("-fx-background-color: rgba(5, 18, 12, 0.6); -fx-background-radius: 8;"
+				+ "-fx-border-color: #2d6a4f; -fx-border-radius: 8;");
+		return box;
 	}
 }
