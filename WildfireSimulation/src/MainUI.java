@@ -196,8 +196,6 @@ public class MainUI {
 				return;
 			}
 
-			stopAnimation();
-
 			originalImage = loaded;
 			int blockSize = (int) Math.round(blockSizeSlider.getValue());
 			graph = graphBuilder.build(originalImage, blockSize);
@@ -231,7 +229,6 @@ public class MainUI {
 			return;
 		}
 
-		stopAnimation();
 		wildfireDijkstra.computeSpreadFrom(ignitionNode, graph);
 		spreadOrder = wildfireDijkstra.getSpreadOrder();
 		if (spreadOrder == null) {
@@ -342,7 +339,6 @@ public class MainUI {
 	}
 
 	private void clearOverlay() {
-		stopAnimation();
 		spreadOrder = null;
 		spreadIndex = 0;
 		ignitionNode = null;
@@ -356,7 +352,6 @@ public class MainUI {
 	}
 
 	private void resetSimulation() {
-		stopAnimation();
 		originalImage = null;
 		classifiedImage = null;
 		originalFxImage = null;
@@ -374,9 +369,6 @@ public class MainUI {
 		redrawClassifiedViewer();
 		updateGridStatus();
 		updateControlStates();
-	}
-
-	private void stopAnimation() {
 	}
 
 	private void redrawClassifiedViewer() {
