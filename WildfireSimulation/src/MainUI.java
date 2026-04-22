@@ -3,8 +3,6 @@ package src;
 import java.awt.image.BufferedImage;
 import java.io.IOException;
 
-import javafx.animation.KeyFrame;
-import javafx.animation.Timeline;
 import javafx.geometry.Insets;
 import javafx.geometry.Pos;
 import javafx.geometry.Rectangle2D;
@@ -33,7 +31,6 @@ import javafx.scene.layout.VBox;
 import javafx.scene.paint.Color;
 import javafx.scene.shape.Rectangle;
 import javafx.stage.Stage;
-import javafx.util.Duration;
 
 public class MainUI {
 
@@ -62,10 +59,11 @@ public class MainUI {
 	private final Label classifiedPlaceholder;
 
 	private final Slider blockSizeSlider;
-	private final Slider speedSlider;
 	private final Label statusLabel;
+	private final Button startButton;
+	private final Button resetButton;
+	private final Button clearOverlayButton;
 
-	private Timeline fireTimeline;
 	private ArrayList<Node> spreadOrder;
 	private int spreadIndex;
 	private double classifiedImgX;
@@ -95,24 +93,17 @@ public class MainUI {
 		this.blockSizeSlider.setMinorTickCount(4);
 		this.blockSizeSlider.setSnapToTicks(true);
 
-		this.speedSlider = new Slider(1, 60, 20);
-		this.speedSlider.setShowTickMarks(true);
-		this.speedSlider.setShowTickLabels(true);
-		this.speedSlider.setMajorTickUnit(10);
-		this.speedSlider.setMinorTickCount(4);
-
-		this.statusLabel = new Label("Load an image to start.");
+		this.statusLabel = new Label("Grid: 0 x 0 | Node count: 0");
 		this.riskLabel = new Label();
+		this.startButton = new Button("Start Simulation");
+		this.resetButton = new Button("Reset");
+		this.clearOverlayButton = new Button("Clear Overlay");
 	}
 
 	public Scene createScene() {
 		Label titleLabel = new Label("Wildfire Spread Simulation");
 		Button loadButton = new Button("Load Terrain Image");
-		Button startButton = new Button("Start Simulation");
-		Button resetButton = new Button("Reset");
-		Button clearOverlayButton = new Button("Clear Overlay");
 		Label blockSizeLabel = new Label("Block Size");
-		Label speedLabel = new Label("Animation Speed (nodes/sec)");
 
 		loadButton.setMaxWidth(Double.MAX_VALUE);
 		startButton.setMaxWidth(Double.MAX_VALUE);
@@ -131,7 +122,6 @@ public class MainUI {
 		resetButton.setStyle(buttonBase + " -fx-background-color: #1565c0;");
 		clearOverlayButton.setStyle(buttonBase + " -fx-background-color: #6a1b9a;");
 		blockSizeLabel.setStyle("-fx-text-fill: #d4f5dd; -fx-font-weight: 600;");
-		speedLabel.setStyle("-fx-text-fill: #d4f5dd; -fx-font-weight: 600;");
 		originalPlaceholder.setStyle("-fx-text-fill: #9cc6ab; -fx-font-size: 15px; -fx-font-style: italic;");
 		classifiedPlaceholder.setStyle("-fx-text-fill: #9cc6ab; -fx-font-size: 15px; -fx-font-style: italic;");
 		originalPlaceholder.setMouseTransparent(true);
@@ -145,8 +135,6 @@ public class MainUI {
 				loadButton,
 				blockSizeLabel,
 				blockSizeSlider,
-				speedLabel,
-				speedSlider,
 				startButton,
 				resetButton,
 				clearOverlayButton,
@@ -196,6 +184,7 @@ public class MainUI {
 		BorderPane.setMargin(statusLabel, new Insets(6, 10, 10, 10));
 		root.setBottom(statusLabel);
 
+		updateControlStates();
 		return new Scene(root, 1300, 760);
 	}
 
@@ -206,8 +195,6 @@ public class MainUI {
 				setStatus("Image load cancelled.");
 				return;
 			}
-
-			stopAnimation();
 
 			originalImage = loaded;
 			int blockSize = (int) Math.round(blockSizeSlider.getValue());
@@ -226,6 +213,7 @@ public class MainUI {
 			String risk = imageClassifier.classify(graph);
 			riskLabel.setText("Risk: " + risk);
 			updateGridStatus();
+			updateControlStates();
 		} catch (IOException ex) {
 			setStatus("Failed to load image: " + ex.getMessage());
 		}
@@ -241,12 +229,14 @@ public class MainUI {
 			return;
 		}
 
-		stopAnimation();
 		wildfireDijkstra.computeSpreadFrom(ignitionNode, graph);
 		spreadOrder = wildfireDijkstra.getSpreadOrder();
-		spreadIndex = 0;
+		if (spreadOrder == null) {
+			spreadOrder = new ArrayList<>();
+		}
+		spreadIndex = spreadOrder.size();
 		redrawOverlay();
-		animateFireSpread(spreadOrder);
+		setStatus("Simulation complete. Burned nodes: " + spreadOrder.size());
 	}
 
 	public void drawOriginalImage() {
@@ -304,27 +294,7 @@ public class MainUI {
 		ignitionNode = selected;
 		redrawOverlay();
 		setStatus("Ignition set at row " + row + ", col " + col + ". Ready to start simulation.");
-	}
-
-	private void animateFireSpread(ArrayList<Node> order) {
-		if (order == null || order.isEmpty()) {
-			setStatus("No spread path found.");
-			return;
-		}
-
-		double speed = speedSlider.getValue();
-		Duration frame = Duration.millis(1000.0 / speed);
-		fireTimeline = new Timeline(new KeyFrame(frame, e -> {
-			if (spreadIndex >= order.size()) {
-				stopAnimation();
-				setStatus("Simulation complete. Burned nodes: " + order.size());
-				return;
-			}
-			spreadIndex++;
-			redrawOverlay();
-		}));
-		fireTimeline.setCycleCount(Timeline.INDEFINITE);
-		fireTimeline.play();
+		updateControlStates();
 	}
 
 	private void redrawOverlay() {
@@ -369,31 +339,36 @@ public class MainUI {
 	}
 
 	private void clearOverlay() {
-		stopAnimation();
 		spreadOrder = null;
 		spreadIndex = 0;
+		ignitionNode = null;
 		redrawOverlay();
-		setStatus("Overlay cleared.");
+		if (graph == null) {
+			setStatus("Overlay cleared.");
+		} else {
+			setStatus("Overlay cleared. Select ignition point.");
+		}
+		updateControlStates();
 	}
 
 	private void resetSimulation() {
-		stopAnimation();
+		originalImage = null;
+		classifiedImage = null;
+		originalFxImage = null;
+		classifiedFxImage = null;
+		graph = null;
 		ignitionNode = null;
 		spreadOrder = null;
 		spreadIndex = 0;
-		redrawOverlay();
-		if (graph != null) {
-			updateGridStatus();
-		} else {
-			setStatus("Simulation reset.");
-		}
-	}
-
-	private void stopAnimation() {
-		if (fireTimeline != null) {
-			fireTimeline.stop();
-			fireTimeline = null;
-		}
+		classifiedImgX = 0;
+		classifiedImgY = 0;
+		classifiedImgW = 0;
+		classifiedImgH = 0;
+		riskLabel.setText("");
+		drawOriginalImage();
+		redrawClassifiedViewer();
+		updateGridStatus();
+		updateControlStates();
 	}
 
 	private void redrawClassifiedViewer() {
@@ -454,12 +429,17 @@ public class MainUI {
 
 	private void updateGridStatus() {
 		if (graph == null || graph.length == 0 || graph[0].length == 0) {
-			setStatus("No graph loaded.");
+			setStatus("Grid: 0 x 0 | Node count: 0");
 			return;
 		}
 		int rows = graph.length;
 		int cols = graph[0].length;
 		setStatus("Grid: " + rows + " x " + cols + " | Node count: " + (rows * cols));
+	}
+
+	private void updateControlStates() {
+		boolean hasGraph = graph != null && graph.length > 0 && graph[0].length > 0;
+		startButton.setDisable(!(hasGraph && ignitionNode != null));
 	}
 
 	private void setStatus(String message) {
@@ -477,7 +457,7 @@ public class MainUI {
 
 	private VBox buildLegend() {
 		Label heading = new Label("Terrain Legend");
-		heading.setStyle("-fx-text-fill: #95ffa3; -fx-font-weight: bold; -fx-font-size: 13px;");
+		heading.setStyle("-fx-text-fill: #74ff87; -fx-font-weight: bold; -fx-font-size: 14px;");
 
 		GridPane grid = new GridPane();
 		grid.setHgap(8);
@@ -494,7 +474,7 @@ public class MainUI {
 			swatch.setStrokeWidth(1);
 
 			Label name = new Label(names[i]);
-			name.setStyle("-fx-text-fill: #c8e6c9; -fx-font-size: 11px;");
+			name.setStyle("-fx-text-fill: #ffffff; -fx-font-size: 12px; -fx-font-weight: 600;");
 
 			grid.add(swatch, 0, i);
 			grid.add(name, 1, i);
