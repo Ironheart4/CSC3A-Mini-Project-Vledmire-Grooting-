@@ -457,7 +457,7 @@ public class MainUI {
 
 	private VBox buildLegend() {
 		Label heading = new Label("Terrain Legend");
-		heading.setStyle("-fx-text-fill: #95ffa3; -fx-font-weight: bold; -fx-font-size: 13px;");
+		heading.setStyle("-fx-text-fill: #74ff87; -fx-font-weight: bold; -fx-font-size: 14px;");
 
 		GridPane grid = new GridPane();
 		grid.setHgap(8);
@@ -474,7 +474,7 @@ public class MainUI {
 			swatch.setStrokeWidth(1);
 
 			Label name = new Label(names[i]);
-			name.setStyle("-fx-text-fill: #c8e6c9; -fx-font-size: 11px;");
+			name.setStyle("-fx-text-fill: #ffffff; -fx-font-size: 12px; -fx-font-weight: 600;");
 
 			grid.add(swatch, 0, i);
 			grid.add(name, 1, i);
