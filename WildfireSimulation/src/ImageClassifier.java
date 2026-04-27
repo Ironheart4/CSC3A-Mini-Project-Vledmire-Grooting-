@@ -47,28 +47,47 @@ public class ImageClassifier {
     private static final double LOW_RISK_WATER_THRESHOLD = 0.40;
 
     /**
+     * Counts nodes per terrain type using a HashMap<Terrain, Integer>.
+     * Returns the map so callers can inspect per-type counts directly.
+     */
+    public Map<Terrain, Integer> countTerrain(Node[][] graph) {
+        Map<Terrain, Integer> counts = new HashMap<>();
+        if (graph == null) return counts;
+        for (int r = 0; r < graph.length; r++) {
+            for (int c = 0; c < graph[r].length; c++) {
+                Terrain t = graph[r][c].getTerrain();
+                Integer prev = counts.get(t);
+                counts.put(t, prev == null ? 1 : prev + 1);
+            }
+        }
+        return counts;
+    }
+
+    /**
      * Analyses the full graph and returns an overall wildfire risk description.
-     * Risk is based on the proportion of high-spread-cost terrain types.
+     * Delegates terrain counting to countTerrain() which uses a HashMap internally.
      */
     public String classify(Node[][] graph) {
         if (graph == null || graph.length == 0) return "Unknown risk";
 
-        int total = 0;
-        int highRisk = 0;   // DRY_VEGETATION
-        int medRisk = 0;    // GRASSLAND, BARREN
-        int blocked = 0;    // WATER
+        Map<Terrain, Integer> counts = countTerrain(graph);
 
-        for (int r = 0; r < graph.length; r++) {
-            for (int c = 0; c < graph[r].length; c++) {
-                Terrain t = graph[r][c].getTerrain();
-                total++;
-                if (t == Terrain.DRY_VEGETATION) highRisk++;
-                else if (t == Terrain.GRASSLAND || t == Terrain.BARREN) medRisk++;
-                else if (t == Terrain.WATER) blocked++;
-            }
+        int total    = 0;
+        for (Terrain t : Terrain.values()) {
+            Integer c = counts.get(t);
+            if (c != null) total += c;
         }
-
         if (total == 0) return "Unknown risk";
+
+        Integer highRiskVal = counts.get(Terrain.DRY_VEGETATION);
+        Integer grassVal    = counts.get(Terrain.GRASSLAND);
+        Integer barrenVal   = counts.get(Terrain.BARREN);
+        Integer waterVal    = counts.get(Terrain.WATER);
+
+        int highRisk = highRiskVal != null ? highRiskVal : 0;
+        int medRisk  = (grassVal  != null ? grassVal  : 0)
+                     + (barrenVal != null ? barrenVal : 0);
+        int blocked  = waterVal   != null ? waterVal  : 0;
 
         double highPct  = (double) highRisk / total;
         double medPct   = (double) medRisk  / total;
