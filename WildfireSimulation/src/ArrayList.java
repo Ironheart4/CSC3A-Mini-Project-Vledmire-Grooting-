@@ -6,7 +6,7 @@ import java.util.NoSuchElementException;
 /**
  * Self-implemented ArrayList<T> - Auxiliary data structure.
  * Used for Node.edges and other lists. Compliant with Mini Project rules.
- * Implements Iterable<T> with a custom nested ArrayIterator.
+ * Implements Iterable<T> to support enhanced for-loops via ArrayIterator.
  */
 public class ArrayList<T> implements Iterable<T> {
 
@@ -101,7 +101,8 @@ public class ArrayList<T> implements Iterable<T> {
     }
 
     /**
-     * Returns a custom iterator over the elements of this ArrayList.
+     * Returns an iterator over the elements in this list (textbook ArrayIterator pattern).
+     * Enables use of ArrayList in enhanced for-loops.
      */
     @Override
     public Iterator<T> iterator() {
@@ -109,7 +110,7 @@ public class ArrayList<T> implements Iterable<T> {
     }
 
     /**
-     * Custom generic iterator for ArrayList.
+     * Textbook-style nested iterator for ArrayList.
      */
     private class ArrayIterator implements Iterator<T> {
         private int cursor = 0;
@@ -121,9 +122,7 @@ public class ArrayList<T> implements Iterable<T> {
 
         @Override
         public T next() {
-            if (!hasNext()) {
-                throw new NoSuchElementException("No more elements in ArrayList");
-            }
+            if (!hasNext()) throw new NoSuchElementException("No more elements");
             return array[cursor++];
         }
     }

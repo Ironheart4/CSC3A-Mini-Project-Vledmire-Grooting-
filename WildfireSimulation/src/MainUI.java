@@ -74,6 +74,11 @@ public class MainUI {
 
 	private final Label riskLabel;
 
+	/** Terrain-count analysis map, populated after image load. */
+	private Map<Terrain, Integer> terrainCounts;
+	/** Displays per-terrain node counts from the HashMap. */
+	private final GridPane analysisGrid;
+
 	public MainUI(Stage stage) {
 		this.stage = stage;
 		this.graphBuilder = new GraphBuilder();
@@ -96,6 +101,7 @@ public class MainUI {
 		this.startButton = new Button("Start Simulation");
 		this.resetButton = new Button("Reset");
 		this.clearOverlayButton = new Button("Clear Overlay");
+		this.analysisGrid = new GridPane();
 	}
 
 	public Scene createScene() {
@@ -135,6 +141,8 @@ public class MainUI {
 
 		VBox legend = buildLegend();
 
+		VBox analysisPanel = buildAnalysisPanel();
+
 		VBox controls = new VBox(10,
 				loadButton,
 				blockSizeLabel,
@@ -144,7 +152,8 @@ public class MainUI {
 				resetButton,
 				clearOverlayButton,
 				riskLabel,
-				legend);
+				legend,
+				analysisPanel);
 		controls.setPadding(new Insets(12));
 		controls.setPrefWidth(260);
 		controls.setStyle(
@@ -211,6 +220,10 @@ public class MainUI {
 			spreadOrder = null;
 			spreadIndex = 0;
 
+			// Populate terrain-count HashMap via ImageClassifier
+			terrainCounts = imageClassifier.countTerrain(graph);
+			updateAnalysisPanel();
+
 			drawOriginalImage();
 			drawClassifiedMaskedImage();
 			redrawOverlay();
@@ -241,7 +254,10 @@ public class MainUI {
 		}
 		spreadIndex = spreadOrder.size();
 		redrawOverlay();
-		setStatus("Simulation complete. Burned nodes: " + spreadOrder.size());
+
+		HashMap<String, Double> dMap = wildfireDijkstra.getDistanceMap();
+		setStatus("Simulation complete. Burned nodes: " + spreadOrder.size()
+				+ " | Distance entries: " + dMap.size());
 	}
 
 	public void drawOriginalImage() {
@@ -324,11 +340,26 @@ public class MainUI {
 		gc.rect(drawX, drawY, drawW, drawH);
 		gc.clip();
 
-		if (spreadOrder != null) {
-			gc.setFill(Color.rgb(255, 69, 0, 0.45));
+		// Distance-based heat overlay: closer nodes are brighter red/orange
+		if (spreadOrder != null && spreadOrder.size() > 0) {
+			// Find max finite distance for normalization
+			double maxDist = 0;
+			for (Node node : spreadOrder) {
+				double d = node.getDistance();
+				if (d != Double.POSITIVE_INFINITY && d > maxDist) maxDist = d;
+			}
+			if (maxDist == 0) maxDist = 1;
+
 			int limit = Math.min(spreadIndex, spreadOrder.size());
 			for (int i = 0; i < limit; i++) {
 				Node node = spreadOrder.get(i);
+				double t = node.getDistance() / maxDist;           // 0 = ignition, 1 = furthest
+				// interpolate from bright orange-red (close) to dark red (far)
+				double alpha  = 0.55 - 0.15 * t;                  // 0.55 → 0.40
+				double red    = 1.0;
+				double green  = 0.30 * (1.0 - t);                 // 0.30 → 0.0
+				double blue   = 0.0;
+				gc.setFill(new Color(red, green, blue, alpha));
 				gc.fillRect(drawX + (node.getCol() * cellW), drawY + (node.getRow() * cellH), cellW, cellH);
 			}
 		}
@@ -369,7 +400,9 @@ public class MainUI {
 		classifiedImgY = 0;
 		classifiedImgW = 0;
 		classifiedImgH = 0;
+		terrainCounts = null;
 		riskLabel.setText("");
+		analysisGrid.getChildren().clear();
 		drawOriginalImage();
 		redrawClassifiedViewer();
 		updateGridStatus();
@@ -543,4 +576,46 @@ public class MainUI {
 				+ "-fx-border-color: #2d6a4f; -fx-border-radius: 8;");
 		return box;
 	}
+
+	/**
+	 * Builds the analysis panel container (the GridPane is populated dynamically
+	 * by updateAnalysisPanel() after image load, using the terrain-count HashMap).
+	 */
+	private VBox buildAnalysisPanel() {
+		Label heading = new Label("Terrain Analysis (HashMap)");
+		heading.setStyle("-fx-text-fill: #74ff87; -fx-font-weight: bold; -fx-font-size: 13px;");
+
+		analysisGrid.setHgap(8);
+		analysisGrid.setVgap(4);
+
+		VBox box = new VBox(6, heading, analysisGrid);
+		box.setPadding(new Insets(8));
+		box.setStyle("-fx-background-color: rgba(5, 18, 12, 0.6); -fx-background-radius: 8;"
+				+ "-fx-border-color: #2d6a4f; -fx-border-radius: 8;");
+		return box;
+	}
+
+	/**
+	 * Refreshes the analysis GridPane from the terrainCounts HashMap.
+	 * Each row shows the terrain type and its node count, read via entrySet().
+	 */
+	private void updateAnalysisPanel() {
+		analysisGrid.getChildren().clear();
+		if (terrainCounts == null || terrainCounts.isEmpty()) return;
+
+		String labelStyle = "-fx-text-fill: #d4f5dd; -fx-font-size: 11px;";
+		String countStyle = "-fx-text-fill: #ffe082; -fx-font-size: 11px; -fx-font-weight: bold;";
+
+		int row = 0;
+		for (Map.Entry<Terrain, Integer> entry : terrainCounts.entrySet()) {
+			Label typeLabel  = new Label(entry.getKey().name());
+			Label countLabel = new Label(String.valueOf(entry.getValue()));
+			typeLabel.setStyle(labelStyle);
+			countLabel.setStyle(countStyle);
+			analysisGrid.add(typeLabel,  0, row);
+			analysisGrid.add(countLabel, 1, row);
+			row++;
+		}
+	}
 }
+
