@@ -1,45 +1,48 @@
 package src;
 
 /**
- * Map ADT - Generic key-value mapping interface.
- * Implemented by HashMap using a hash table.
+ * Map<K, V> interface - Defines the contract for key-value mappings.
+ * Follows textbook AbstractMap guidance (Goodrich et al.).
  */
 public interface Map<K, V> {
 
-    /**
-     * Associates the specified value with the specified key.
-     * If the key already exists, its value is replaced.
-     */
-    void put(K key, V value);
+    /** Returns the number of entries in the map. */
+    int size();
+
+    /** Returns true if the map contains no entries. */
+    boolean isEmpty();
 
     /**
-     * Returns the value mapped to the given key, or null if absent.
+     * Returns the value associated with key, or null if key is absent.
      */
     V get(K key);
 
     /**
-     * Returns true if this map contains a mapping for the given key.
+     * Associates the given value with the given key.
+     * If the key was already present, replaces the old value and returns it.
+     * Returns null if the key is new.
      */
-    boolean containsKey(K key);
+    V put(K key, V value);
 
     /**
-     * Removes the mapping for the given key and returns the old value,
-     * or null if the key was not present.
+     * Removes the entry with the given key, returning its value, or null if absent.
      */
     V remove(K key);
 
+    /** Returns an iterable collection of all keys. */
+    Iterable<K> keySet();
+
+    /** Returns an iterable collection of all values. */
+    Iterable<V> values();
+
+    /** Returns an iterable collection of all key-value entries. */
+    Iterable<Map.Entry<K, V>> entrySet();
+
     /**
-     * Returns the value mapped to the given key, or {@code defaultValue}
-     * if the key is absent.
+     * Nested Entry interface — represents a key-value pair stored in the map.
      */
-    default V getOrDefault(K key, V defaultValue) {
-        V value = get(key);
-        return (value != null) ? value : defaultValue;
+    interface Entry<K, V> {
+        K getKey();
+        V getValue();
     }
-
-    /** Returns the number of key-value mappings in this map. */
-    int size();
-
-    /** Returns true if this map contains no mappings. */
-    boolean isEmpty();
 }

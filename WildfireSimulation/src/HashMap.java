@@ -1,139 +1,196 @@
 package src;
 
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+
 /**
- * HashMap - Self-implemented Hash Table ADT.
- * Implements the Map interface using separate chaining for collision resolution.
- * Average O(1) put/get/containsKey/remove; resizes when load factor exceeds 0.75.
+ * HashMap<K, V> - Custom hash-table implementation using separate chaining.
+ * Extends AbstractMap, which provides isEmpty(), keySet(), and values().
+ * Stores entries in an array of ArrayList buckets; resizes when load factor
+ * exceeds MAX_LOAD_FACTOR.
  */
-public class HashMap<K, V> implements Map<K, V> {
+public class HashMap<K, V> extends AbstractMap<K, V> {
 
-    private static final int   DEFAULT_CAPACITY   = 16;
-    private static final double LOAD_FACTOR_LIMIT = 0.75;
+    private static final int    DEFAULT_CAPACITY  = 17;
+    private static final double MAX_LOAD_FACTOR   = 0.75;
 
-    /** A single entry in the chain. */
-    private static class Entry<K, V> {
-        K key;
-        V value;
-        Entry<K, V> next;
+    private int                             capacity;
+    private int                             size;
+    private ArrayList<MapEntry<K, V>>[]     table;
 
-        Entry(K key, V value) {
-            this.key   = key;
-            this.value = value;
-            this.next  = null;
-        }
+    // -----------------------------------------------------------------------
+    //  Constructors
+    // -----------------------------------------------------------------------
+
+    public HashMap() {
+        this(DEFAULT_CAPACITY);
     }
 
     @SuppressWarnings("unchecked")
-    private Entry<K, V>[] buckets = new Entry[DEFAULT_CAPACITY];
-    private int capacity  = DEFAULT_CAPACITY;
-    private int size      = 0;
-
-    // ------------------------------------------------------------------ //
-    //  Map interface                                                       //
-    // ------------------------------------------------------------------ //
-
-    @Override
-    public void put(K key, V value) {
-        if (key == null) return;
-
-        if ((double) size / capacity >= LOAD_FACTOR_LIMIT) {
-            resize();
-        }
-
-        int idx = indexOf(key);
-        Entry<K, V> head = buckets[idx];
-
-        // Update existing key
-        for (Entry<K, V> e = head; e != null; e = e.next) {
-            if (e.key.equals(key)) {
-                e.value = value;
-                return;
-            }
-        }
-
-        // Insert new entry at head of chain
-        Entry<K, V> newEntry = new Entry<>(key, value);
-        newEntry.next = head;
-        buckets[idx]  = newEntry;
-        size++;
+    public HashMap(int initialCapacity) {
+        this.capacity = Math.max(1, initialCapacity);
+        this.size     = 0;
+        this.table    = new ArrayList[this.capacity];
     }
 
-    @Override
-    public V get(K key) {
-        if (key == null) return null;
-        Entry<K, V> e = findEntry(key);
-        return (e != null) ? e.value : null;
+    // -----------------------------------------------------------------------
+    //  Private helpers
+    // -----------------------------------------------------------------------
+
+    /** Maps a key to a bucket index in [0, capacity). */
+    private int hashIndex(K key) {
+        if (key == null) return 0;
+        return Math.abs(key.hashCode()) % capacity;
     }
 
-    @Override
-    public boolean containsKey(K key) {
-        if (key == null) return false;
-        return findEntry(key) != null;
-    }
-
-    @Override
-    public V remove(K key) {
-        if (key == null) return null;
-
-        int idx = indexOf(key);
-        Entry<K, V> prev = null;
-        Entry<K, V> curr = buckets[idx];
-
-        while (curr != null) {
-            if (curr.key.equals(key)) {
-                if (prev == null) {
-                    buckets[idx] = curr.next;
-                } else {
-                    prev.next = curr.next;
-                }
-                size--;
-                return curr.value;
-            }
-            prev = curr;
-            curr = curr.next;
-        }
-        return null;
-    }
+    // -----------------------------------------------------------------------
+    //  Map interface methods
+    // -----------------------------------------------------------------------
 
     @Override
     public int size() { return size; }
 
     @Override
-    public boolean isEmpty() { return size == 0; }
-
-    // ------------------------------------------------------------------ //
-    //  Internal helpers                                                    //
-    // ------------------------------------------------------------------ //
-
-    private int indexOf(K key) {
-        int hash = key.hashCode();
-        // Keep index non-negative and within capacity
-        return (hash & 0x7fffffff) % capacity;
-    }
-
-    private Entry<K, V> findEntry(K key) {
-        for (Entry<K, V> e = buckets[indexOf(key)]; e != null; e = e.next) {
-            if (e.key.equals(key)) return e;
+    public V get(K key) {
+        int idx = hashIndex(key);
+        ArrayList<MapEntry<K, V>> bucket = table[idx];
+        if (bucket == null) return null;
+        for (MapEntry<K, V> entry : bucket) {
+            if (keysEqual(entry.getKey(), key)) return entry.getValue();
         }
         return null;
     }
 
-    @SuppressWarnings("unchecked")
-    private void resize() {
-        int newCapacity     = capacity * 2;
-        Entry<K, V>[] newBuckets = new Entry[newCapacity];
+    @Override
+    public V put(K key, V value) {
+        int idx = hashIndex(key);
+        if (table[idx] == null) table[idx] = new ArrayList<>();
+        ArrayList<MapEntry<K, V>> bucket = table[idx];
+        for (MapEntry<K, V> entry : bucket) {
+            if (keysEqual(entry.getKey(), key)) {
+                V old = entry.getValue();
+                entry.setValue(value);
+                return old;
+            }
+        }
+        bucket.add(new MapEntry<>(key, value));
+        size++;
+        if ((double) size / capacity > MAX_LOAD_FACTOR) resize();
+        return null;
+    }
 
-        for (int i = 0; i < capacity; i++) {
-            for (Entry<K, V> e = buckets[i]; e != null; ) {
-                Entry<K, V> next = e.next;
-                int newIdx = (e.key.hashCode() & 0x7fffffff) % newCapacity;
-                e.next          = newBuckets[newIdx];
-                newBuckets[newIdx] = e;
-                e = next;
+    @Override
+    public V remove(K key) {
+        int idx = hashIndex(key);
+        ArrayList<MapEntry<K, V>> bucket = table[idx];
+        if (bucket == null) return null;
+        for (int i = 0; i < bucket.size(); i++) {
+            MapEntry<K, V> entry = bucket.get(i);
+            if (keysEqual(entry.getKey(), key)) {
+                bucket.remove(i);
+                size--;
+                return entry.getValue();
+            }
+        }
+        return null;
+    }
+
+    // -----------------------------------------------------------------------
+    //  entrySet() — drives AbstractMap's keySet() and values()
+    // -----------------------------------------------------------------------
+
+    @Override
+    public Iterable<Map.Entry<K, V>> entrySet() {
+        return new EntryIterable();
+    }
+
+    private class EntryIterable implements Iterable<Map.Entry<K, V>> {
+        @Override
+        public Iterator<Map.Entry<K, V>> iterator() {
+            return new EntryIterator();
+        }
+    }
+
+    /** Iterates over all entries across all buckets. */
+    private class EntryIterator implements Iterator<Map.Entry<K, V>> {
+        private int                           bucketIdx = 0;
+        private Iterator<MapEntry<K, V>>      bucketIter;
+
+        public EntryIterator() { advance(); }
+
+        /** Advances to the next non-empty bucket. */
+        private void advance() {
+            while (bucketIdx < capacity) {
+                if (table[bucketIdx] != null && table[bucketIdx].size() > 0) {
+                    if (bucketIter == null || !bucketIter.hasNext()) {
+                        bucketIter = table[bucketIdx].iterator();
+                    }
+                    if (bucketIter.hasNext()) return;
+                }
+                bucketIdx++;
+                bucketIter = null;
             }
         }
 
-        buckets  = newBuckets;
-        capacity = newCapacity;
+        @Override
+        public boolean hasNext() {
+            return bucketIdx < capacity && bucketIter != null && bucketIter.hasNext();
+        }
+
+        @Override
+        public Map.Entry<K, V> next() {
+            if (!hasNext()) throw new NoSuchElementException();
+            Map.Entry<K, V> result = bucketIter.next();
+            if (!bucketIter.hasNext()) {
+                bucketIdx++;
+                bucketIter = null;
+                advance();
+            }
+            return result;
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    //  Resize
+    // -----------------------------------------------------------------------
+
+    @SuppressWarnings("unchecked")
+    private void resize() {
+        int newCap = capacity * 2 + 1;
+        ArrayList<MapEntry<K, V>>[] oldTable = table;
+        int oldCap = capacity;
+        capacity = newCap;
+        size     = 0;
+        table    = new ArrayList[newCap];
+        for (int i = 0; i < oldCap; i++) {
+            ArrayList<MapEntry<K, V>> bucket = oldTable[i];
+            if (bucket == null) continue;
+            for (MapEntry<K, V> entry : bucket) {
+                put(entry.getKey(), entry.getValue());
+            }
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    //  Utility
+    // -----------------------------------------------------------------------
+
+    /** Null-safe key equality check. */
+    private boolean keysEqual(K a, K b) {
+        if (a == null) return b == null;
+        return a.equals(b);
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder("{");
+        boolean first = true;
+        for (Map.Entry<K, V> e : entrySet()) {
+            if (!first) sb.append(", ");
+            sb.append(e.getKey()).append("=").append(e.getValue());
+            first = false;
+        }
+        sb.append("}");
+        return sb.toString();
     }
 }

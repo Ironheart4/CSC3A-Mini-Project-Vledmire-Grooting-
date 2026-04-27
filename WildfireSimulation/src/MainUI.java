@@ -11,7 +11,7 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.Slider;
+import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.PixelFormat;
 import javafx.scene.image.PixelWriter;
@@ -58,7 +58,8 @@ public class MainUI {
 	private final Label originalPlaceholder;
 	private final Label classifiedPlaceholder;
 
-	private final Slider blockSizeSlider;
+	private final TextField blockSizeField;
+	private final Button applyBlockSizeButton;
 	private final Label statusLabel;
 	private final Button startButton;
 	private final Button resetButton;
@@ -73,6 +74,11 @@ public class MainUI {
 
 	private final Label riskLabel;
 
+	/** Terrain-count analysis map, populated after image load. */
+	private Map<Terrain, Integer> terrainCounts;
+	/** Displays per-terrain node counts from the HashMap. */
+	private final GridPane analysisGrid;
+
 	public MainUI(Stage stage) {
 		this.stage = stage;
 		this.graphBuilder = new GraphBuilder();
@@ -86,34 +92,34 @@ public class MainUI {
 		this.originalPlaceholder = new Label("No terrain image loaded");
 		this.classifiedPlaceholder = new Label("Awaiting classification");
 
-		this.blockSizeSlider = new Slider(5, 50, 10);
-		this.blockSizeSlider.setShowTickMarks(true);
-		this.blockSizeSlider.setShowTickLabels(true);
-		this.blockSizeSlider.setMajorTickUnit(15);
-		this.blockSizeSlider.setMinorTickCount(4);
-		this.blockSizeSlider.setSnapToTicks(true);
+		this.blockSizeField = new TextField();
+		this.blockSizeField.setPromptText("1 - 40");
+		this.applyBlockSizeButton = new Button("Apply");
 
 		this.statusLabel = new Label("Grid: 0 x 0 | Node count: 0");
 		this.riskLabel = new Label();
 		this.startButton = new Button("Start Simulation");
 		this.resetButton = new Button("Reset");
 		this.clearOverlayButton = new Button("Clear Overlay");
+		this.analysisGrid = new GridPane();
 	}
 
 	public Scene createScene() {
 		Label titleLabel = new Label("Wildfire Spread Simulation");
 		Button loadButton = new Button("Load Terrain Image");
-		Label blockSizeLabel = new Label("Block Size");
+		Label blockSizeLabel = new Label("Block Size (1 - 40)");
 
 		loadButton.setMaxWidth(Double.MAX_VALUE);
 		startButton.setMaxWidth(Double.MAX_VALUE);
 		resetButton.setMaxWidth(Double.MAX_VALUE);
 		clearOverlayButton.setMaxWidth(Double.MAX_VALUE);
+		applyBlockSizeButton.setMaxWidth(Double.MAX_VALUE);
 
 		loadButton.setOnAction(e -> loadTerrainImage());
 		startButton.setOnAction(e -> startSimulation());
 		resetButton.setOnAction(e -> resetSimulation());
 		clearOverlayButton.setOnAction(e -> clearOverlay());
+		applyBlockSizeButton.setOnAction(e -> applyBlockSize());
 
 		titleLabel.setStyle("-fx-text-fill: #74ff87; -fx-font-size: 24px; -fx-font-weight: bold;");
 		String buttonBase = "-fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8;";
@@ -122,6 +128,10 @@ public class MainUI {
 		resetButton.setStyle(buttonBase + " -fx-background-color: #1565c0;");
 		clearOverlayButton.setStyle(buttonBase + " -fx-background-color: #6a1b9a;");
 		blockSizeLabel.setStyle("-fx-text-fill: #d4f5dd; -fx-font-weight: 600;");
+		blockSizeField.setStyle("-fx-background-color: #1a3a27; -fx-text-fill: #d4f5dd;"
+				+ " -fx-prompt-text-fill: #6a9a7a; -fx-background-radius: 6; -fx-border-color: #2d6a4f;"
+				+ " -fx-border-radius: 6;");
+		applyBlockSizeButton.setStyle(buttonBase + " -fx-background-color: #1b5e20;");
 		originalPlaceholder.setStyle("-fx-text-fill: #9cc6ab; -fx-font-size: 15px; -fx-font-style: italic;");
 		classifiedPlaceholder.setStyle("-fx-text-fill: #9cc6ab; -fx-font-size: 15px; -fx-font-style: italic;");
 		originalPlaceholder.setMouseTransparent(true);
@@ -131,15 +141,19 @@ public class MainUI {
 
 		VBox legend = buildLegend();
 
+		VBox analysisPanel = buildAnalysisPanel();
+
 		VBox controls = new VBox(10,
 				loadButton,
 				blockSizeLabel,
-				blockSizeSlider,
+				blockSizeField,
+				applyBlockSizeButton,
 				startButton,
 				resetButton,
 				clearOverlayButton,
 				riskLabel,
-				legend);
+				legend,
+				analysisPanel);
 		controls.setPadding(new Insets(12));
 		controls.setPrefWidth(260);
 		controls.setStyle(
@@ -197,7 +211,7 @@ public class MainUI {
 			}
 
 			originalImage = loaded;
-			int blockSize = (int) Math.round(blockSizeSlider.getValue());
+			int blockSize = parseBlockSize();
 			graph = graphBuilder.build(originalImage, blockSize);
 			classifiedImage = imageClassifier.createMaskedImage(graph, originalImage);
 			originalFxImage = toFxImage(originalImage);
@@ -205,6 +219,10 @@ public class MainUI {
 			ignitionNode = null;
 			spreadOrder = null;
 			spreadIndex = 0;
+
+			// Populate terrain-count HashMap via ImageClassifier
+			terrainCounts = imageClassifier.countTerrain(graph);
+			updateAnalysisPanel();
 
 			drawOriginalImage();
 			drawClassifiedMaskedImage();
@@ -236,7 +254,10 @@ public class MainUI {
 		}
 		spreadIndex = spreadOrder.size();
 		redrawOverlay();
-		setStatus("Simulation complete. Burned nodes: " + spreadOrder.size());
+
+		HashMap<String, Double> dMap = wildfireDijkstra.getDistanceMap();
+		setStatus("Simulation complete. Burned nodes: " + spreadOrder.size()
+				+ " | Distance entries: " + dMap.size());
 	}
 
 	public void drawOriginalImage() {
@@ -319,11 +340,26 @@ public class MainUI {
 		gc.rect(drawX, drawY, drawW, drawH);
 		gc.clip();
 
-		if (spreadOrder != null) {
-			gc.setFill(Color.rgb(255, 69, 0, 0.45));
+		// Distance-based heat overlay: closer nodes are brighter red/orange
+		if (spreadOrder != null && spreadOrder.size() > 0) {
+			// Find max finite distance for normalization
+			double maxDist = 0;
+			for (Node node : spreadOrder) {
+				double d = node.getDistance();
+				if (d != Double.POSITIVE_INFINITY && d > maxDist) maxDist = d;
+			}
+			if (maxDist == 0) maxDist = 1;
+
 			int limit = Math.min(spreadIndex, spreadOrder.size());
 			for (int i = 0; i < limit; i++) {
 				Node node = spreadOrder.get(i);
+				double t = node.getDistance() / maxDist;           // 0 = ignition, 1 = furthest
+				// interpolate from bright orange-red (close) to dark red (far)
+				double alpha  = 0.55 - 0.15 * t;                  // 0.55 → 0.40
+				double red    = 1.0;
+				double green  = 0.30 * (1.0 - t);                 // 0.30 → 0.0
+				double blue   = 0.0;
+				gc.setFill(new Color(red, green, blue, alpha));
 				gc.fillRect(drawX + (node.getCol() * cellW), drawY + (node.getRow() * cellH), cellW, cellH);
 			}
 		}
@@ -364,7 +400,9 @@ public class MainUI {
 		classifiedImgY = 0;
 		classifiedImgW = 0;
 		classifiedImgH = 0;
+		terrainCounts = null;
 		riskLabel.setText("");
+		analysisGrid.getChildren().clear();
 		drawOriginalImage();
 		redrawClassifiedViewer();
 		updateGridStatus();
@@ -437,6 +475,58 @@ public class MainUI {
 		setStatus("Grid: " + rows + " x " + cols + " | Node count: " + (rows * cols));
 	}
 
+	/**
+	 * Parses block size from the text field.
+	 * Acceptable display range shown to user is 1–40; internally clamped to 5–50.
+	 */
+	private int parseBlockSize() {
+		String text = blockSizeField.getText().trim();
+		if (!text.isEmpty()) {
+			try {
+				int value = Integer.parseInt(text);
+				if (value < 5 || value > 50) {
+					setStatus("Block size must be between 1 and 40. Using default 10.");
+					blockSizeField.setText("");
+					return 10;
+				}
+				return value;
+			} catch (NumberFormatException ex) {
+				setStatus("Invalid block size. Using default 10.");
+				blockSizeField.setText("");
+			}
+		}
+		return 10;
+	}
+
+	/**
+	 * Applies the block size from the text field and rebuilds the graph if an
+	 * image is already loaded.
+	 */
+	private void applyBlockSize() {
+		if (originalImage == null) {
+			setStatus("Load an image first, then apply block size.");
+			return;
+		}
+		int blockSize = parseBlockSize();
+		try {
+			graph = graphBuilder.build(originalImage, blockSize);
+			classifiedImage = imageClassifier.createMaskedImage(graph, originalImage);
+			classifiedFxImage = toFxImage(classifiedImage);
+			ignitionNode = null;
+			spreadOrder = null;
+			spreadIndex = 0;
+			drawClassifiedMaskedImage();
+			redrawOverlay();
+			String risk = imageClassifier.classify(graph);
+			riskLabel.setText("Risk: " + risk);
+			updateGridStatus();
+			updateControlStates();
+			setStatus("Block size applied: " + blockSize);
+		} catch (Exception ex) {
+			setStatus("Failed to apply block size: " + ex.getMessage());
+		}
+	}
+
 	private void updateControlStates() {
 		boolean hasGraph = graph != null && graph.length > 0 && graph[0].length > 0;
 		startButton.setDisable(!(hasGraph && ignitionNode != null));
@@ -486,4 +576,46 @@ public class MainUI {
 				+ "-fx-border-color: #2d6a4f; -fx-border-radius: 8;");
 		return box;
 	}
+
+	/**
+	 * Builds the analysis panel container (the GridPane is populated dynamically
+	 * by updateAnalysisPanel() after image load, using the terrain-count HashMap).
+	 */
+	private VBox buildAnalysisPanel() {
+		Label heading = new Label("Terrain Analysis (HashMap)");
+		heading.setStyle("-fx-text-fill: #74ff87; -fx-font-weight: bold; -fx-font-size: 13px;");
+
+		analysisGrid.setHgap(8);
+		analysisGrid.setVgap(4);
+
+		VBox box = new VBox(6, heading, analysisGrid);
+		box.setPadding(new Insets(8));
+		box.setStyle("-fx-background-color: rgba(5, 18, 12, 0.6); -fx-background-radius: 8;"
+				+ "-fx-border-color: #2d6a4f; -fx-border-radius: 8;");
+		return box;
+	}
+
+	/**
+	 * Refreshes the analysis GridPane from the terrainCounts HashMap.
+	 * Each row shows the terrain type and its node count, read via entrySet().
+	 */
+	private void updateAnalysisPanel() {
+		analysisGrid.getChildren().clear();
+		if (terrainCounts == null || terrainCounts.isEmpty()) return;
+
+		String labelStyle = "-fx-text-fill: #d4f5dd; -fx-font-size: 11px;";
+		String countStyle = "-fx-text-fill: #ffe082; -fx-font-size: 11px; -fx-font-weight: bold;";
+
+		int row = 0;
+		for (Map.Entry<Terrain, Integer> entry : terrainCounts.entrySet()) {
+			Label typeLabel  = new Label(entry.getKey().name());
+			Label countLabel = new Label(String.valueOf(entry.getValue()));
+			typeLabel.setStyle(labelStyle);
+			countLabel.setStyle(countStyle);
+			analysisGrid.add(typeLabel,  0, row);
+			analysisGrid.add(countLabel, 1, row);
+			row++;
+		}
+	}
 }
+
