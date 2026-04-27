@@ -24,13 +24,21 @@ public class WildfireDijkstra {
         distanceMap    = new HashMap<>();
         predecessorMap = new HashMap<>();
 
-        // Reset all nodes
+        // --- Hash Table ADT: track distances and visited status externally ---
+        HashMap<String, Double>  dist    = new HashMap<>();
+        HashMap<String, Boolean> visited = new HashMap<>();
+
+        // Initialise all nodes: reset Node fields and seed the dist map
         for (int r = 0; r < graph.length; r++) {
             for (int c = 0; c < graph[r].length; c++) {
-                graph[r][c].resetForSimulation();
+                Node n = graph[r][c];
+                n.resetForSimulation();                     // resets node-internal fields
+                dist.put(key(n), Double.POSITIVE_INFINITY); // dist map starts at ∞
             }
         }
 
+        // Source node has distance 0 in both the map and the node field (used by PQ)
+        dist.put(key(start), 0.0);
         start.setDistance(0);
 
         PriorityQueue<Node> pq = new PriorityQueue<>();
@@ -38,9 +46,11 @@ public class WildfireDijkstra {
 
         while (!pq.isEmpty()) {
             Node current = pq.poll();
-            if (current == null || current.isVisited()) continue;
+            if (current == null) continue;
 
-            current.setVisited(true);
+            String currentKey = key(current);
+            if (visited.containsKey(currentKey)) continue; // already finalised
+            visited.put(currentKey, true);
             spreadOrder.add(current);
 
             // Record final distance and predecessor in the HashMaps
@@ -54,8 +64,9 @@ public class WildfireDijkstra {
                 Node neighbor = edge.getTarget();
                 double newDist = current.getDistance() + edge.getWeight();
 
-                if (newDist < neighbor.getDistance()) {
-                    neighbor.setDistance(newDist);
+                if (newDist < oldDist) {
+                    dist.put(nKey, newDist);          // update Hash Table
+                    neighbor.setDistance(newDist);     // keep PQ ordering in sync
                     neighbor.setPrevious(current);
                     pq.add(neighbor);
                 }
