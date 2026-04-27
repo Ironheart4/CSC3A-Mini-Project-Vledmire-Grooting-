@@ -1,4 +1,5 @@
 /ArrayList.class
+/ArrayList$*.class
 /Main.class
 /Terrain.class
 /Edge.class
@@ -10,3 +11,5 @@
 /MainUI.class
 /App.class
 /ImageLoader.class
+/HashTableMap.class
+/HashTableMap$*.class

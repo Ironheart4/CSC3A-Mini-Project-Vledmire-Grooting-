@@ -1,9 +1,14 @@
 package src;
+
+import java.util.Iterator;
+import java.util.NoSuchElementException;
+
 /**
  * Self-implemented ArrayList<T> - Auxiliary data structure.
  * Used for Node.edges and other lists. Compliant with Mini Project rules.
+ * Implements Iterable<T> with a custom nested ArrayIterator.
  */
-public class ArrayList<T> {
+public class ArrayList<T> implements Iterable<T> {
 
     private int capacity;
     private T[] array;
@@ -93,5 +98,33 @@ public class ArrayList<T> {
         }
         sb.append("]");
         return sb.toString();
+    }
+
+    /**
+     * Returns a custom iterator over the elements of this ArrayList.
+     */
+    @Override
+    public Iterator<T> iterator() {
+        return new ArrayIterator();
+    }
+
+    /**
+     * Custom generic iterator for ArrayList.
+     */
+    private class ArrayIterator implements Iterator<T> {
+        private int cursor = 0;
+
+        @Override
+        public boolean hasNext() {
+            return cursor < size;
+        }
+
+        @Override
+        public T next() {
+            if (!hasNext()) {
+                throw new NoSuchElementException("No more elements in ArrayList");
+            }
+            return array[cursor++];
+        }
     }
 }
