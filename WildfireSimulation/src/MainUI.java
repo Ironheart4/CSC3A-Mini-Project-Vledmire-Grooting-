@@ -11,7 +11,7 @@ import javafx.scene.canvas.Canvas;
 import javafx.scene.canvas.GraphicsContext;
 import javafx.scene.control.Button;
 import javafx.scene.control.Label;
-import javafx.scene.control.Slider;
+import javafx.scene.control.TextField;
 import javafx.scene.image.Image;
 import javafx.scene.image.PixelFormat;
 import javafx.scene.image.PixelWriter;
@@ -58,7 +58,8 @@ public class MainUI {
 	private final Label originalPlaceholder;
 	private final Label classifiedPlaceholder;
 
-	private final Slider blockSizeSlider;
+	private final TextField blockSizeField;
+	private final Button applyBlockSizeButton;
 	private final Label statusLabel;
 	private final Button startButton;
 	private final Button resetButton;
@@ -86,12 +87,9 @@ public class MainUI {
 		this.originalPlaceholder = new Label("No terrain image loaded");
 		this.classifiedPlaceholder = new Label("Awaiting classification");
 
-		this.blockSizeSlider = new Slider(5, 50, 10);
-		this.blockSizeSlider.setShowTickMarks(true);
-		this.blockSizeSlider.setShowTickLabels(true);
-		this.blockSizeSlider.setMajorTickUnit(15);
-		this.blockSizeSlider.setMinorTickCount(4);
-		this.blockSizeSlider.setSnapToTicks(true);
+		this.blockSizeField = new TextField();
+		this.blockSizeField.setPromptText("1 - 40");
+		this.applyBlockSizeButton = new Button("Apply");
 
 		this.statusLabel = new Label("Grid: 0 x 0 | Node count: 0");
 		this.riskLabel = new Label();
@@ -103,17 +101,19 @@ public class MainUI {
 	public Scene createScene() {
 		Label titleLabel = new Label("Wildfire Spread Simulation");
 		Button loadButton = new Button("Load Terrain Image");
-		Label blockSizeLabel = new Label("Block Size");
+		Label blockSizeLabel = new Label("Block Size (1 - 40)");
 
 		loadButton.setMaxWidth(Double.MAX_VALUE);
 		startButton.setMaxWidth(Double.MAX_VALUE);
 		resetButton.setMaxWidth(Double.MAX_VALUE);
 		clearOverlayButton.setMaxWidth(Double.MAX_VALUE);
+		applyBlockSizeButton.setMaxWidth(Double.MAX_VALUE);
 
 		loadButton.setOnAction(e -> loadTerrainImage());
 		startButton.setOnAction(e -> startSimulation());
 		resetButton.setOnAction(e -> resetSimulation());
 		clearOverlayButton.setOnAction(e -> clearOverlay());
+		applyBlockSizeButton.setOnAction(e -> applyBlockSize());
 
 		titleLabel.setStyle("-fx-text-fill: #74ff87; -fx-font-size: 24px; -fx-font-weight: bold;");
 		String buttonBase = "-fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8;";
@@ -122,6 +122,10 @@ public class MainUI {
 		resetButton.setStyle(buttonBase + " -fx-background-color: #1565c0;");
 		clearOverlayButton.setStyle(buttonBase + " -fx-background-color: #6a1b9a;");
 		blockSizeLabel.setStyle("-fx-text-fill: #d4f5dd; -fx-font-weight: 600;");
+		blockSizeField.setStyle("-fx-background-color: #1a3a27; -fx-text-fill: #d4f5dd;"
+				+ " -fx-prompt-text-fill: #6a9a7a; -fx-background-radius: 6; -fx-border-color: #2d6a4f;"
+				+ " -fx-border-radius: 6;");
+		applyBlockSizeButton.setStyle(buttonBase + " -fx-background-color: #1b5e20;");
 		originalPlaceholder.setStyle("-fx-text-fill: #9cc6ab; -fx-font-size: 15px; -fx-font-style: italic;");
 		classifiedPlaceholder.setStyle("-fx-text-fill: #9cc6ab; -fx-font-size: 15px; -fx-font-style: italic;");
 		originalPlaceholder.setMouseTransparent(true);
@@ -134,7 +138,8 @@ public class MainUI {
 		VBox controls = new VBox(10,
 				loadButton,
 				blockSizeLabel,
-				blockSizeSlider,
+				blockSizeField,
+				applyBlockSizeButton,
 				startButton,
 				resetButton,
 				clearOverlayButton,
@@ -197,7 +202,7 @@ public class MainUI {
 			}
 
 			originalImage = loaded;
-			int blockSize = (int) Math.round(blockSizeSlider.getValue());
+			int blockSize = parseBlockSize();
 			graph = graphBuilder.build(originalImage, blockSize);
 			classifiedImage = imageClassifier.createMaskedImage(graph, originalImage);
 			originalFxImage = toFxImage(originalImage);
@@ -435,6 +440,58 @@ public class MainUI {
 		int rows = graph.length;
 		int cols = graph[0].length;
 		setStatus("Grid: " + rows + " x " + cols + " | Node count: " + (rows * cols));
+	}
+
+	/**
+	 * Parses block size from the text field.
+	 * Acceptable display range shown to user is 1–40; internally clamped to 5–50.
+	 */
+	private int parseBlockSize() {
+		String text = blockSizeField.getText().trim();
+		if (!text.isEmpty()) {
+			try {
+				int value = Integer.parseInt(text);
+				if (value < 5 || value > 50) {
+					setStatus("Block size must be between 1 and 40. Using default 10.");
+					blockSizeField.setText("");
+					return 10;
+				}
+				return value;
+			} catch (NumberFormatException ex) {
+				setStatus("Invalid block size. Using default 10.");
+				blockSizeField.setText("");
+			}
+		}
+		return 10;
+	}
+
+	/**
+	 * Applies the block size from the text field and rebuilds the graph if an
+	 * image is already loaded.
+	 */
+	private void applyBlockSize() {
+		if (originalImage == null) {
+			setStatus("Load an image first, then apply block size.");
+			return;
+		}
+		int blockSize = parseBlockSize();
+		try {
+			graph = graphBuilder.build(originalImage, blockSize);
+			classifiedImage = imageClassifier.createMaskedImage(graph, originalImage);
+			classifiedFxImage = toFxImage(classifiedImage);
+			ignitionNode = null;
+			spreadOrder = null;
+			spreadIndex = 0;
+			drawClassifiedMaskedImage();
+			redrawOverlay();
+			String risk = imageClassifier.classify(graph);
+			riskLabel.setText("Risk: " + risk);
+			updateGridStatus();
+			updateControlStates();
+			setStatus("Block size applied: " + blockSize);
+		} catch (Exception ex) {
+			setStatus("Failed to apply block size: " + ex.getMessage());
+		}
 	}
 
 	private void updateControlStates() {
