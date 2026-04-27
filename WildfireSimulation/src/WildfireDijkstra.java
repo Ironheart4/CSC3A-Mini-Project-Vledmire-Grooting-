@@ -61,9 +61,8 @@ public class WildfireDijkstra {
                 String nKey      = key(neighbor);
                 double newDist   = currentDist + edge.getWeight();
 
-                double oldDist = dist.containsKey(nKey)
-                        ? dist.get(nKey)
-                        : Double.POSITIVE_INFINITY;
+                Double stored = dist.get(nKey);
+                double oldDist = (stored != null) ? stored : Double.POSITIVE_INFINITY;
 
                 if (newDist < oldDist) {
                     dist.put(nKey, newDist);          // update Hash Table

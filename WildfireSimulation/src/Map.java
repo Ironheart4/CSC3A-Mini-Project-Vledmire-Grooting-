@@ -28,6 +28,15 @@ public interface Map<K, V> {
      */
     V remove(K key);
 
+    /**
+     * Returns the value mapped to the given key, or {@code defaultValue}
+     * if the key is absent.
+     */
+    default V getOrDefault(K key, V defaultValue) {
+        V value = get(key);
+        return (value != null) ? value : defaultValue;
+    }
+
     /** Returns the number of key-value mappings in this map. */
     int size();
 

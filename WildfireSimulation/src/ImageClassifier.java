@@ -66,16 +66,16 @@ public class ImageClassifier {
         for (int r = 0; r < graph.length; r++) {
             for (int c = 0; c < graph[r].length; c++) {
                 Terrain t = graph[r][c].getTerrain();
-                counts.put(t, counts.get(t) + 1);
+                counts.put(t, counts.getOrDefault(t, 0) + 1);
                 total++;
             }
         }
 
         if (total == 0) return "Unknown risk";
 
-        double highPct  = (double) counts.get(Terrain.DRY_VEGETATION) / total;
-        double medPct   = (double) (counts.get(Terrain.GRASSLAND) + counts.get(Terrain.BARREN)) / total;
-        double waterPct = (double) counts.get(Terrain.WATER) / total;
+        double highPct  = (double) counts.getOrDefault(Terrain.DRY_VEGETATION, 0) / total;
+        double medPct   = (double) (counts.getOrDefault(Terrain.GRASSLAND, 0) + counts.getOrDefault(Terrain.BARREN, 0)) / total;
+        double waterPct = (double) counts.getOrDefault(Terrain.WATER, 0) / total;
 
         if (highPct >= EXTREME_RISK_THRESHOLD) return "EXTREME risk — large dry-vegetation coverage";
         if (highPct >= HIGH_RISK_THRESHOLD) return "HIGH risk — significant dry-vegetation present";
