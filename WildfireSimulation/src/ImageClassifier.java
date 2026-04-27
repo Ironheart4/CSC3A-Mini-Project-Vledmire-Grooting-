@@ -49,30 +49,33 @@ public class ImageClassifier {
     /**
      * Analyses the full graph and returns an overall wildfire risk description.
      * Risk is based on the proportion of high-spread-cost terrain types.
+     *
+     * Uses a HashMap (Hash Table ADT) to count the frequency of each Terrain
+     * type across the graph instead of maintaining separate int counters.
      */
     public String classify(Node[][] graph) {
         if (graph == null || graph.length == 0) return "Unknown risk";
 
-        int total = 0;
-        int highRisk = 0;   // DRY_VEGETATION
-        int medRisk = 0;    // GRASSLAND, BARREN
-        int blocked = 0;    // WATER
+        // Map ADT: terrain type -> occurrence count
+        HashMap<Terrain, Integer> counts = new HashMap<>();
+        for (Terrain t : Terrain.values()) {
+            counts.put(t, 0);
+        }
 
+        int total = 0;
         for (int r = 0; r < graph.length; r++) {
             for (int c = 0; c < graph[r].length; c++) {
                 Terrain t = graph[r][c].getTerrain();
+                counts.put(t, counts.get(t) + 1);
                 total++;
-                if (t == Terrain.DRY_VEGETATION) highRisk++;
-                else if (t == Terrain.GRASSLAND || t == Terrain.BARREN) medRisk++;
-                else if (t == Terrain.WATER) blocked++;
             }
         }
 
         if (total == 0) return "Unknown risk";
 
-        double highPct  = (double) highRisk / total;
-        double medPct   = (double) medRisk  / total;
-        double waterPct = (double) blocked  / total;
+        double highPct  = (double) counts.get(Terrain.DRY_VEGETATION) / total;
+        double medPct   = (double) (counts.get(Terrain.GRASSLAND) + counts.get(Terrain.BARREN)) / total;
+        double waterPct = (double) counts.get(Terrain.WATER) / total;
 
         if (highPct >= EXTREME_RISK_THRESHOLD) return "EXTREME risk — large dry-vegetation coverage";
         if (highPct >= HIGH_RISK_THRESHOLD) return "HIGH risk — significant dry-vegetation present";
