@@ -38,6 +38,10 @@ public class MainUI {
 	private static final double DEFAULT_VIEWER_HEIGHT = 420;
 	private static final String VIEWER_BORDER_COLOR = "#4f7f62";
 	private static final String VIEWER_BACKGROUND_COLOR = "#09160f";
+	/** Base CSS applied to every action button (colour appended per-button). */
+	private static final String BUTTON_BASE_STYLE =
+			"-fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8;"
+			+ " -fx-min-height: 36px; -fx-font-size: 13px;";
 
 	private final Stage stage;
 	private final GraphBuilder graphBuilder;
@@ -151,19 +155,17 @@ public class MainUI {
 		sptOverlayButton.setOnAction(e -> toggleSPTOverlay());
 
 		titleLabel.setStyle("-fx-text-fill: #74ff87; -fx-font-size: 24px; -fx-font-weight: bold;");
-		String buttonBase = "-fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8;"
-				+ " -fx-min-height: 36px; -fx-font-size: 13px;";
-		loadButton.setStyle(buttonBase + " -fx-background-color: #2e7d32;");
-		startButton.setStyle(buttonBase + " -fx-background-color: #ef6c00;");
-		resetButton.setStyle(buttonBase + " -fx-background-color: #1565c0;");
-		clearOverlayButton.setStyle(buttonBase + " -fx-background-color: #6a1b9a;");
-		graphOverlayButton.setStyle(buttonBase + " -fx-background-color: #00695c;");
-		sptOverlayButton.setStyle(buttonBase + " -fx-background-color: #4527a0;");
+		loadButton.setStyle(BUTTON_BASE_STYLE + " -fx-background-color: #2e7d32;");
+		startButton.setStyle(BUTTON_BASE_STYLE + " -fx-background-color: #ef6c00;");
+		resetButton.setStyle(BUTTON_BASE_STYLE + " -fx-background-color: #1565c0;");
+		clearOverlayButton.setStyle(BUTTON_BASE_STYLE + " -fx-background-color: #6a1b9a;");
+		graphOverlayButton.setStyle(BUTTON_BASE_STYLE + " -fx-background-color: #00695c;");
+		sptOverlayButton.setStyle(BUTTON_BASE_STYLE + " -fx-background-color: #4527a0;");
 		blockSizeLabel.setStyle("-fx-text-fill: #d4f5dd; -fx-font-weight: 600;");
 		blockSizeField.setStyle("-fx-background-color: #1a3a27; -fx-text-fill: #d4f5dd;"
 				+ " -fx-prompt-text-fill: #6a9a7a; -fx-background-radius: 6; -fx-border-color: #2d6a4f;"
 				+ " -fx-border-radius: 6;");
-		applyBlockSizeButton.setStyle(buttonBase + " -fx-background-color: #1b5e20;");
+		applyBlockSizeButton.setStyle(BUTTON_BASE_STYLE + " -fx-background-color: #1b5e20;");
 		originalPlaceholder.setStyle("-fx-text-fill: #9cc6ab; -fx-font-size: 15px; -fx-font-style: italic;");
 		classifiedPlaceholder.setStyle("-fx-text-fill: #9cc6ab; -fx-font-size: 15px; -fx-font-style: italic;");
 		originalPlaceholder.setMouseTransparent(true);
@@ -538,10 +540,8 @@ public class MainUI {
 		ignitionNode = null;
 		showGraphOverlay = false;
 		showSPTOverlay   = false;
-		String btnBase = "-fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8;"
-				+ " -fx-min-height: 36px; -fx-font-size: 13px;";
-		graphOverlayButton.setStyle(btnBase + " -fx-background-color: #00695c;");
-		sptOverlayButton.setStyle(btnBase + " -fx-background-color: #4527a0;");
+		graphOverlayButton.setStyle(BUTTON_BASE_STYLE + " -fx-background-color: #00695c;");
+		sptOverlayButton.setStyle(BUTTON_BASE_STYLE + " -fx-background-color: #4527a0;");
 		redrawOverlay();
 		if (graph == null) {
 			setStatus("Overlay cleared.");
@@ -713,13 +713,11 @@ public class MainUI {
 	 */
 	private void toggleGraphOverlay() {
 		showGraphOverlay = !showGraphOverlay;
-		String btnBase = "-fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8;"
-				+ " -fx-min-height: 36px; -fx-font-size: 13px;";
 		if (showGraphOverlay) {
-			graphOverlayButton.setStyle(btnBase + " -fx-background-color: #00897b;");
+			graphOverlayButton.setStyle(BUTTON_BASE_STYLE + " -fx-background-color: #00897b;");
 			setStatus("Graph (RAG) overlay ON — circles = nodes, sticks = edges, bright = boundary.");
 		} else {
-			graphOverlayButton.setStyle(btnBase + " -fx-background-color: #00695c;");
+			graphOverlayButton.setStyle(BUTTON_BASE_STYLE + " -fx-background-color: #00695c;");
 			setStatus("Graph (RAG) overlay OFF.");
 		}
 		redrawOverlay();
@@ -733,13 +731,11 @@ public class MainUI {
 	 */
 	private void toggleSPTOverlay() {
 		showSPTOverlay = !showSPTOverlay;
-		String btnBase = "-fx-text-fill: white; -fx-font-weight: bold; -fx-background-radius: 8;"
-				+ " -fx-min-height: 36px; -fx-font-size: 13px;";
 		if (showSPTOverlay) {
-			sptOverlayButton.setStyle(btnBase + " -fx-background-color: #6a1b9a;");
+			sptOverlayButton.setStyle(BUTTON_BASE_STYLE + " -fx-background-color: #6a1b9a;");
 			setStatus("Spread Tree (SPT) overlay ON — run simulation to populate.");
 		} else {
-			sptOverlayButton.setStyle(btnBase + " -fx-background-color: #4527a0;");
+			sptOverlayButton.setStyle(BUTTON_BASE_STYLE + " -fx-background-color: #4527a0;");
 			setStatus("Spread Tree (SPT) overlay OFF.");
 		}
 		redrawOverlay();
@@ -757,7 +753,7 @@ public class MainUI {
 	private VBox buildLegend() {
 		String labelStyle = "-fx-text-fill: #ffffff; -fx-font-size: 11px; -fx-font-weight: 600;";
 		String panelStyle = "-fx-background-color: rgba(5, 18, 12, 0.6); -fx-background-radius: 8;"
-				+ "-fx-border-color: #2d6a4f; -fx-border-radius: 8;";
+				+ " -fx-border-color: #2d6a4f; -fx-border-radius: 8;";
 
 		// --- Terrain colours ---
 		Label terrainHeading = new Label("Terrain");
